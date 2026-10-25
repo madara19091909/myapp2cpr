@@ -1,20 +1,21 @@
 import 'dart:math' as math;
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/ticker_builder.dart';
 import '../../../core/widgets/toast.dart';
 import '../../game/state/game_state.dart';
 import '../widgets/plot_tile.dart';
 import '../widgets/seed_picker.dart';
+import '../widgets/particle_system.dart';
+import '../widgets/achievement_popup.dart';
+import '../services/sound_service.dart';
 
-// ═══════════════════════════════════════════════════════════════════
-//  FarmScreen — النسخة الخارقة
-// ═══════════════════════════════════════════════════════════════════
 class FarmScreen extends StatefulWidget {
   const FarmScreen({super.key});
 
@@ -22,673 +23,773 @@ class FarmScreen extends StatefulWidget {
   State<FarmScreen> createState() => _FarmScreenState();
 }
 
-class _FarmScreenState extends State<FarmScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _sceneCtrl;   // حركة المشهد (24s loop)
-  late final AnimationController _entranceCtrl; // دخول الشاشة
-
+class _FarmScreenState extends State<FarmScreen> with TickerProviderStateMixin {
+  late AnimationController _timeController;
+  late AnimationController _parallaxController;
+  late SoundService _soundService;
+  
   @override
   void initState() {
     super.initState();
-    _sceneCtrl = AnimationController(
+    _soundService = SoundService();
+    _timeController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 24),
+      duration: const Duration(seconds: 60),
     )..repeat();
-    _entranceCtrl = AnimationController(
+    
+    _parallaxController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..forward();
+      duration: const Duration(seconds: 20),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _sceneCtrl.dispose();
-    _entranceCtrl.dispose();
+    _timeController.dispose();
+    _parallaxController.dispose();
+    _soundService.dispose();
     super.dispose();
   }
 
-  // ────────────────────────── منطق النقر ──────────────────────────
-  Future<void> _onTap(BuildContext context, int i) async {
-    HapticFeedback.lightImpact();
-    final g = context.read<GameState>();
-    final plot = g.plots[i];
+  Future<void> _handlePlotTap(BuildContext context, int index) async {
+    final gameState = context.read<GameState>();
+    final plot = gameState.plots[index];
     final now = DateTime.now();
 
     if (plot.isEmpty) {
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        builder: (_) => SeedPicker(plotIndex: i),
+      await _handleEmptyPlot(context, index);
+      return;
+    }
+
+    if (plot.isReady(now)) {
+      await _handleHarvest(context, index, gameState);
+      return;
+    }
+
+    _handleUnripePlot();
+  }
+
+  Future<void> _handleEmptyPlot(BuildContext context, int index) async {
+    _soundService.playTap();
+    HapticFeedback.selectionClick();
+    
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => SeedPicker(plotIndex: index),
+    );
+  }
+
+  Future<void> _handleHarvest(
+    BuildContext context,
+    int index,
+    GameState gameState,
+  ) async {
+    // اهتزاز قوي ومُرضي
+    await HapticFeedback.heavyImpact();
+    _soundService.playHarvest();
+
+    final result = gameState.harvest(index);
+    if (result != null) {
+      // تأثير الجسيمات المتقدم
+      _showHarvestParticles(context, index);
+      
+      // التحقق من الإنجازات
+      await _checkAchievements(context, gameState, result);
+
+      // رسالة النجاح المحسنة
+      final levelUpMsg = result.levelsGained > 0
+          ? '\n🎉 مستوى جديد: ${gameState.level}! +${result.levelsGained * GameState.levelUpGoldReward} 🪙'
+          : '';
+
+      _showSuccessToast(
+        context,
+        '+${formatIqd(result.income)}  •  +${result.xp} XP$levelUpMsg',
       );
-    } else if (plot.isReady(now)) {
-      HapticFeedback.mediumImpact();
-      final r = g.harvest(i);
-      if (r != null) {
-        final extra = r.levelsGained > 0
-            ? '\n🎉 ارتقيت للمستوى ${g.level}! +${r.levelsGained * GameState.levelUpGoldReward} 🪙'
-            : '';
-        showToast(
-          context,
-          '+${formatIqd(r.income)}  •  +${r.xp} XP$extra',
-          color: AppColors.green,
-        );
-      }
-    } else {
-      HapticFeedback.selectionClick();
-      showToast(context, 'المحصول لم ينضج بعد ⏳');
     }
   }
 
-  // ──────────────────────────── build ────────────────────────────
+  void _showHarvestParticles(BuildContext context, int index) {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    // إظهار عملات متطايرة
+    ParticleSystem.show(
+      context: context,
+      particleType: ParticleType.coins,
+      count: 20,
+      origin: Offset(renderBox.size.width / 2, renderBox.size.height / 2),
+    );
+
+    // إظهار نجوم متلألئة
+    ParticleSystem.show(
+      context: context,
+      particleType: ParticleType.stars,
+      count: 15,
+      origin: Offset(renderBox.size.width / 2, renderBox.size.height / 2),
+    );
+  }
+
+  Future<void> _checkAchievements(
+    BuildContext context,
+    GameState gameState,
+    dynamic result,
+  ) async {
+    // تحقق من الإنجازات
+    if (gameState.level > 5 && !gameState.hasShownLevel5Achievement) {
+      AchievementPopup.show(
+        context,
+        title: 'إنجاز رائع!',
+        description: 'وصلت للمستوى 5!',
+        icon: Icons.emoji_events,
+        color: Colors.amber,
+      );
+      gameState.hasShownLevel5Achievement = true;
+    }
+
+    if (result.income > 1000 && !gameState.hasShownRichAchievement) {
+      AchievementPopup.show(
+        context,
+        title: 'ثروة!',
+        description: 'حصلت على أكثر من 1000 في حصاد واحد!',
+        icon: Icons.attach_money,
+        color: Colors.green,
+      );
+      gameState.hasShownRichAchievement = true;
+    }
+  }
+
+  void _showSuccessToast(BuildContext context, String message) {
+    showToast(
+      context,
+      message,
+      color: AppColors.green,
+      icon: Icons.eco,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  void _handleUnripePlot() {
+    _soundService.playError();
+    HapticFeedback.lightImpact();
+    showToast(
+      context,
+      'المحصول لم ينضج بعد ⏳',
+      color: Colors.orangeAccent,
+      icon: Icons.hourglass_empty,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final g = context.watch<GameState>();
+    final gameState = context.watch<GameState>();
     final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width >= 900 ? 5 : (width >= 600 ? 4 : 3);
+    final crossAxisCount = width >= 600 ? 4 : 3;
 
-    final fadeIn = CurvedAnimation(
-      parent: _entranceCtrl,
-      curve: Curves.easeOut,
-    );
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFB9E9FF),
-            Color(0xFFEAF8D9),
-            Color(0xFF78C34B),
-          ],
-          stops: [0, .42, 1],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // ✨ جزيئات طافية في الخلفية
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _sceneCtrl,
-                builder: (_, __) => CustomPaint(
-                  painter: _SkyParticlesPainter(t: _sceneCtrl.value),
-                ),
-              ),
-            ),
-          ),
-
-          Column(
+    return Scaffold(
+      body: _DynamicBackground(
+        timeController: _timeController,
+        child: SafeArea(
+          child: Column(
             children: [
-              FadeTransition(
-                opacity: fadeIn,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, -.05),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: _entranceCtrl,
-                    curve: Curves.easeOutCubic,
-                  )),
-                  child: Column(
-                    children: [
-                      _FarmWelcomeScene(animation: _sceneCtrl),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                        child: _BadgesRow(gameState: g),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-                        child: _PlotsHeader(plotCount: g.plots.length),
-                      ),
-                    ],
-                  ),
-                ),
+              _PremiumFarmHeader(
+                parallaxController: _parallaxController,
+                timeController: _timeController,
               ),
-
+              _StatsBar(
+                speedFactor: gameState.speedFactor,
+                yieldMultiplier: gameState.yieldMultiplier,
+                petBonus: gameState.petBonusPercent,
+              ),
+              _SectionTitle(totalPlots: gameState.plots.length),
               Expanded(
-                child: TickerBuilder(
-                  builder: (context, now) => GridView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(13, 2, 13, 16),
-                    itemCount: g.plots.length,
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: .92,
-                    ),
-                    itemBuilder: (context, i) {
-                      return _StaggeredAppear(
-                        index: i,
-                        controller: _entranceCtrl,
-                        child: RepaintBoundary(
-                          child: PlotTile(
-                            plot: g.plots[i],
-                            now: now,
-                            onTap: () => _onTap(context, i),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                child: _OptimizedFarmGrid(
+                  plots: gameState.plots,
+                  crossAxisCount: crossAxisCount,
+                  onTap: (i) => _handlePlotTap(context, i),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  المشهد الحي — سماء، شمس، سحب، طيور، أشجار، حيوانات
-// ═══════════════════════════════════════════════════════════════════
-class _FarmWelcomeScene extends StatelessWidget {
-  const _FarmWelcomeScene({required this.animation});
-  final Animation<double> animation;
+/// ==========================================
+/// 1. الخلفية الديناميكية (نهار/ليل)
+/// ==========================================
+class _DynamicBackground extends StatelessWidget {
+  final AnimationController timeController;
+  final Widget child;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 178,
-      margin: const EdgeInsets.fromLTRB(12, 9, 12, 0),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF805126), width: 3),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33704420),
-            blurRadius: 7,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, _) {
-          final t = animation.value;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // 🌤️ سماء → أرض
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF6CC7F4),
-                      Color(0xFFD8F2A4),
-                      Color(0xFF69B747),
-                    ],
-                    stops: [0, .54, .55],
-                  ),
-                ),
-              ),
-
-              // ☀️ شمس بأشعة دوّارة
-              Positioned(
-                top: 8,
-                right: 12,
-                width: 46,
-                height: 46,
-                child: Transform.rotate(
-                  angle: t * 2 * math.pi,
-                  child: CustomPaint(painter: _SunRaysPainter()),
-                ),
-              ),
-
-              // ☁️ سحب منجرفة
-              _drift(
-                t: t,
-                from: -60,
-                to: 480,
-                top: 6,
-                child: const Text('☁️', style: TextStyle(fontSize: 26)),
-              ),
-              _drift(
-                t: (t + .35) % 1,
-                from: -60,
-                to: 480,
-                top: 16,
-                child: const Text('☁️', style: TextStyle(fontSize: 20)),
-              ),
-              _drift(
-                t: (t + .70) % 1,
-                from: 500,
-                to: -60,
-                top: 10,
-                child: const Text('☁️', style: TextStyle(fontSize: 22)),
-              ),
-
-              // 🐦 طيور طائرة
-              _drift(
-                t: (t + .15) % 1,
-                from: -40,
-                to: 520,
-                top: 44,
-                child: const Text('🐦', style: TextStyle(fontSize: 16)),
-              ),
-              _drift(
-                t: (t + .55) % 1,
-                from: 520,
-                to: -40,
-                top: 58,
-                child: const Text('🐦', style: TextStyle(fontSize: 13)),
-              ),
-
-              // خط الأفق
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 40,
-                child: Container(height: 2, color: const Color(0x5586A64C)),
-              ),
-
-              // 🌳 أشجار تتمايل
-              Positioned(
-                left: 14,
-                bottom: 30,
-                child: Transform.rotate(
-                  angle: math.sin(t * 2 * math.pi * 2) * .05,
-                  alignment: Alignment.bottomCenter,
-                  child: const Text('🌳', style: TextStyle(fontSize: 43)),
-                ),
-              ),
-              Positioned(
-                right: 6,
-                bottom: 29,
-                child: Transform.rotate(
-                  angle: math.sin(t * 2 * math.pi * 2 + 1) * .05,
-                  alignment: Alignment.bottomCenter,
-                  child: const Text('🌳', style: TextStyle(fontSize: 46)),
-                ),
-              ),
-
-              // 🏡 بيت بنافذة تنبض
-              Positioned(
-                left: 60,
-                bottom: 20,
-                child: Stack(
-                  children: [
-                    const Text('🏡', style: TextStyle(fontSize: 68)),
-                    Positioned(
-                      left: 28,
-                      top: 34,
-                      child: Opacity(
-                        opacity: .5 + .5 * math.sin(t * 2 * math.pi * 3),
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFE98A),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFFFFE98A),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Positioned(
-                right: 56,
-                bottom: 20,
-                child: Text('🏚️', style: TextStyle(fontSize: 65)),
-              ),
-
-              // أرض ترابية
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(height: 22, color: const Color(0xFF7A4B29)),
-              ),
-
-              const Positioned(
-                left: 15,
-                bottom: 2,
-                child: Text('🌼  🌱  🌷  🌱  🌼',
-                    style: TextStyle(fontSize: 15)),
-              ),
-              const Positioned(
-                right: 12,
-                bottom: 2,
-                child: Text('🌻  🌱  🌼', style: TextStyle(fontSize: 15)),
-              ),
-
-              // لوحة العنوان
-              Positioned(
-                left: 12,
-                top: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFDF1D0),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(
-                        color: const Color(0xFF8B5B2D), width: 2),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x33000000),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    'مزرعتي الجميلة',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF57391E),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-
-              // 🐔 🐄 🐑 حيوانات "تتنفس"
-              _breathe(
-                t: t,
-                left: 17,
-                bottom: 27,
-                child: const Text('🐔', style: TextStyle(fontSize: 24)),
-              ),
-              _breathe(
-                t: (t + .33) % 1,
-                right: 103,
-                bottom: 27,
-                child: const Text('🐄', style: TextStyle(fontSize: 27)),
-              ),
-              _breathe(
-                t: (t + .66) % 1,
-                right: 18,
-                bottom: 28,
-                child: const Text('🐑', style: TextStyle(fontSize: 23)),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _drift({
-    required double t,
-    required double from,
-    required double to,
-    required double top,
-    required Widget child,
-  }) {
-    final x = from + (to - from) * t;
-    return Positioned(top: top, left: x, child: child);
-  }
-
-  Widget _breathe({
-    required double t,
-    double? left,
-    double? right,
-    double? bottom,
-    required Widget child,
-  }) {
-    final s = 1 + .06 * math.sin(t * 2 * math.pi * 4);
-    return Positioned(
-      left: left,
-      right: right,
-      bottom: bottom,
-      child: Transform.scale(scale: s, child: child),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  رسام أشعة الشمس
-// ═══════════════════════════════════════════════════════════════════
-class _SunRaysPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final r = size.shortestSide / 2;
-
-    final rayPaint = Paint()
-      ..color = const Color(0xFFFFE066).withOpacity(.75)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-
-    for (var i = 0; i < 8; i++) {
-      final a = (i / 8) * 2 * math.pi;
-      final dir = Offset(math.cos(a), math.sin(a));
-      canvas.drawLine(c + dir * (r * .55), c + dir * (r * .9), rayPaint);
-    }
-
-    canvas.drawCircle(
-      c,
-      r * .42,
-      Paint()
-        ..color = const Color(0xFFFFE066)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawCircle(
-      c,
-      r * .42,
-      Paint()
-        ..color = const Color(0xFFFFB300)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  جزيئات خلفية طافية (pollen / sparkles)
-// ═══════════════════════════════════════════════════════════════════
-class _SkyParticlesPainter extends CustomPainter {
-  _SkyParticlesPainter({required this.t});
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    for (var i = 0; i < 14; i++) {
-      final seed = i * 97.13;
-      final x = ((seed + t * 180) % (size.width + 40)) - 20;
-      final yBase = (seed * 1.7) % (size.height * .55);
-      final y = yBase + 6 * math.sin(t * 6 + i);
-      final r = 1.4 + (i % 3) * .8;
-      final opacity = (.25 + .35 * math.sin(t * 4 + i)).clamp(.05, .7);
-      canvas.drawCircle(
-        Offset(x, y),
-        r,
-        paint..color = Colors.white.withOpacity(opacity),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SkyParticlesPainter old) => old.t != t;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  صف الشارات
-// ═══════════════════════════════════════════════════════════════════
-class _BadgesRow extends StatelessWidget {
-  const _BadgesRow({required this.gameState});
-  final GameState gameState;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 5,
-      alignment: WrapAlignment.center,
-      children: [
-        _Badge(
-          icon: '⚡',
-          label: 'الوقت ×${(1 / gameState.speedFactor).toStringAsFixed(1)}',
-        ),
-        _Badge(
-          icon: '🌾',
-          label: 'الحصاد ×${gameState.yieldMultiplier}',
-        ),
-        _Badge(
-          icon: '🐾',
-          label: 'الحيوانات +${gameState.petBonusPercent}%',
-        ),
-      ],
-    );
-  }
-}
-
-class _Badge extends StatefulWidget {
-  const _Badge({required this.icon, required this.label});
-  final String icon;
-  final String label;
-
-  @override
-  State<_Badge> createState() => _BadgeState();
-}
-
-class _BadgeState extends State<_Badge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  const _DynamicBackground({
+    required this.timeController,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _ctrl,
+      animation: timeController,
       builder: (context, _) {
-        final shimmer = (math.sin(_ctrl.value * 2 * math.pi) + 1) / 2;
-        return Transform.scale(
-          scale: 1 + .02 * shimmer,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(.95),
-                  Color.lerp(Colors.white,
-                      AppColors.green.withOpacity(.22), shimmer)!,
+        final timeOfDay = timeController.value;
+        final colors = _getGradientColors(timeOfDay);
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: colors,
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+          child: child,
+        );
+      },
+    );
+  }
+
+  List<Color> _getGradientColors(double timeOfDay) {
+    // 0.0 - 0.25: فجر
+    // 0.25 - 0.5: نهار
+    // 0.5 - 0.75: غروب
+    // 0.75 - 1.0: ليل
+
+    if (timeOfDay < 0.25) {
+      return [
+        const Color(0xFFFFB347), // برتقالي
+        const Color(0xFFFFCC80), // أصفر فاتح
+        const Color(0xFF81C784), // أخضر
+      ];
+    } else if (timeOfDay < 0.5) {
+      return [
+        const Color(0xFF4FC3F7), // أزرق فاتح
+        const Color(0xFFB3E5FC), // أزرق سماوي
+        const Color(0xFF66BB6A), // أخضر
+      ];
+    } else if (timeOfDay < 0.75) {
+      return [
+        const Color(0xFFFF7043), // برتقالي غروب
+        const Color(0xFFFFAB91), // وردي
+        const Color(0xFF5C6BC0), // بنفسجي
+      ];
+    } else {
+      return [
+        const Color(0xFF1A237E), // أزرق داكن
+        const Color(0xFF283593), // نيلي
+        const Color(0xFF1B5E20), // أخضر داكن
+      ];
+    }
+  }
+}
+
+/// ==========================================
+/// 2. الهيدر مع تأثير Parallax
+/// ==========================================
+class _PremiumFarmHeader extends StatelessWidget {
+  final AnimationController parallaxController;
+  final AnimationController timeController;
+
+  const _PremiumFarmHeader({
+    required this.parallaxController,
+    required this.timeController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 200,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2D5A15).withOpacity(0.4),
+            blurRadius: 25,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // خلفية متدرجة
+          _AnimatedSkyBackground(timeController: timeController),
+
+          // نجوم ليلية
+          AnimatedBuilder(
+            animation: timeController,
+            builder: (context, _) {
+              final showStars = timeController.value > 0.75;
+              return showStars
+                  ? const _StarField()
+                  : const SizedBox.shrink();
+            },
+          ),
+
+          // الشمس/القمر
+          _CelestialBody(timeController: timeController),
+
+          // السحب المتحركة مع Parallax
+          AnimatedBuilder(
+            animation: parallaxController,
+            builder: (context, _) {
+              final offset = parallaxController.value * 30;
+              return Stack(
+                children: [
+                  Positioned(
+                    top: 30,
+                    left: 20 + offset,
+                    child: _AnimatedCloud(size: 50, duration: 15),
+                  ),
+                  Positioned(
+                    top: 50,
+                    right: 80 - offset,
+                    child: _AnimatedCloud(size: 35, duration: 20),
+                  ),
+                  Positioned(
+                    top: 70,
+                    left: 120 + offset * 0.5,
+                    child: _AnimatedCloud(size: 40, duration: 18),
+                  ),
+                ],
+              );
+            },
+          ),
+
+          // الأرضية والمزرعة
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF6B4226),
+                    const Color(0xFF4A2E1B),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // بطاقة العنوان (Glassmorphism)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: _GlassCard(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.agriculture, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'مزرعتي',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      fontSize: 16,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: Offset(1, 1),
+                        )
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.soilDark, width: 2),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.icon, style: const TextStyle(fontSize: 14)),
-                const SizedBox(width: 4),
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.dark,
+          ),
+
+          // شارة الوقت
+          Positioned(
+            top: 16,
+            right: 16,
+            child: AnimatedBuilder(
+              animation: timeController,
+              builder: (context, _) {
+                final timeText = _getTimeText(timeController.value);
+                return _GlassCard(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_getTimeIcon(timeController.value), 
+                           color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        timeText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTimeText(double timeOfDay) {
+    if (timeOfDay < 0.25) return 'فجر';
+    if (timeOfDay < 0.5) return 'نهار';
+    if (timeOfDay < 0.75) return 'غروب';
+    return 'ليل';
+  }
+
+  IconData _getTimeIcon(double timeOfDay) {
+    if (timeOfDay < 0.25) return Icons.wb_twilight;
+    if (timeOfDay < 0.5) return Icons.wb_sunny;
+    if (timeOfDay < 0.75) return Icons.wb_twilight;
+    return Icons.nightlight_round;
+  }
+}
+
+/// ==========================================
+/// 3. السماء المتحركة
+/// ==========================================
+class _AnimatedSkyBackground extends StatelessWidget {
+  final AnimationController timeController;
+
+  const _AnimatedSkyBackground({required this.timeController});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: timeController,
+      builder: (context, _) {
+        final timeOfDay = timeController.value;
+        final colors = _getSkyColors(timeOfDay);
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: colors,
+              stops: const [0.0, 0.6, 0.61],
             ),
           ),
         );
       },
     );
   }
+
+  List<Color> _getSkyColors(double timeOfDay) {
+    if (timeOfDay < 0.25) {
+      return [
+        const Color(0xFFFFB347),
+        const Color(0xFFFFCC80),
+        const Color(0xFF81C784),
+      ];
+    } else if (timeOfDay < 0.5) {
+      return [
+        const Color(0xFF4FC3F7),
+        const Color(0xFF88D4A1),
+        const Color(0xFF5C9E31),
+      ];
+    } else if (timeOfDay < 0.75) {
+      return [
+        const Color(0xFFFF7043),
+        const Color(0xFFFFAB91),
+        const Color(0xFF5C6BC0),
+      ];
+    } else {
+      return [
+        const Color(0xFF1A237E),
+        const Color(0xFF283593),
+        const Color(0xFF1B5E20),
+      ];
+    }
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  رأس قسم الحقول
-// ═══════════════════════════════════════════════════════════════════
-class _PlotsHeader extends StatelessWidget {
-  const _PlotsHeader({required this.plotCount});
-  final int plotCount;
+/// ==========================================
+/// 4. حقل النجوم
+/// ==========================================
+class _StarField extends StatelessWidget {
+  const _StarField();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Text('🌱', style: TextStyle(fontSize: 22)),
-        const SizedBox(width: 7),
-        const Expanded(
-          child: Text(
-            'حقول مزرعتك',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF315D25),
+    return CustomPaint(
+      painter: _StarPainter(),
+      child: Container(),
+    ).animate(onPlay: (c) => c.repeat()).opacity(
+          begin: 0.3,
+          end: 1.0,
+          duration: 2000.ms,
+        );
+  }
+}
+
+class _StarPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(42);
+    final paint = Paint()..color = Colors.white;
+
+    for (int i = 0; i < 50; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height * 0.6;
+      final radius = random.nextDouble() * 2 + 1;
+
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// ==========================================
+/// 5. الشمس/القمر
+/// ==========================================
+class _CelestialBody extends StatelessWidget {
+  final AnimationController timeController;
+
+  const _CelestialBody({required this.timeController});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: timeController,
+      builder: (context, _) {
+        final timeOfDay = timeController.value;
+        final isNight = timeOfDay > 0.75;
+
+        return Positioned(
+          top: 20 + (math.sin(timeOfDay * math.pi * 2) * 20),
+          right: 30,
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: isNight
+                    ? [Colors.grey.shade200, Colors.grey.shade400]
+                    : [Colors.yellow.shade200, Colors.orange.shade300],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isNight ? Colors.grey : Colors.yellow)
+                      .withOpacity(0.6),
+                  blurRadius: 30,
+                  spreadRadius: 10,
+                )
+              ],
+            ),
+          ).animate(onPlay: (c) => c.repeat()).scaleXY(
+                begin: 1.0,
+                end: 1.1,
+                duration: 2000.ms,
+              ),
+        );
+      },
+    );
+  }
+}
+
+/// ==========================================
+/// 6. البطاقة الزجاجية
+/// ==========================================
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+
+  const _GlassCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.25),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.4),
+              width: 1.5,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// ==========================================
+/// 7. السحابة المتحركة
+/// ==========================================
+class _AnimatedCloud extends StatelessWidget {
+  final double size;
+  final int duration;
+
+  const _AnimatedCloud({required this.size, required this.duration});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size * 0.6,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(size),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.5),
+            blurRadius: 10,
+          )
+        ],
+      ),
+    ).animate(onPlay: (c) => c.repeat(reverse: true)).translateX(
+          begin: -10,
+          end: 10,
+          duration: (duration * 1000).ms,
+        );
+  }
+}
+
+/// ==========================================
+/// 8. شريط الإحصائيات المتقدم
+/// ==========================================
+class _StatsBar extends StatelessWidget {
+  final double speedFactor;
+  final int yieldMultiplier;
+  final int petBonus;
+
+  const _StatsBar({
+    required this.speedFactor,
+    required this.yieldMultiplier,
+    required this.petBonus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.4),
+                  Colors.white.withOpacity(0.15),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.5),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _AnimatedStatBadge(
+                  icon: Icons.bolt,
+                  value: (1 / speedFactor).toStringAsFixed(1),
+                  prefix: '×',
+                  color: Colors.amber,
+                  label: 'سرعة',
+                ),
+                _AnimatedStatBadge(
+                  icon: Icons.grain,
+                  value: yieldMultiplier.toString(),
+                  prefix: '×',
+                  color: Colors.green,
+                  label: 'حصاد',
+                ),
+                _AnimatedStatBadge(
+                  icon: Icons.pets,
+                  value: petBonus.toString(),
+                  prefix: '+',
+                  suffix: '%',
+                  color: Colors.pink,
+                  label: 'حيوانات',
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.2, end: 0);
+  }
+}
+
+/// ==========================================
+/// 9. شارة الإحصائيات المتحركة
+/// ==========================================
+class _AnimatedStatBadge extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String prefix;
+  final String suffix;
+  final Color color;
+  final String label;
+
+  const _AnimatedStatBadge({
+    required this.icon,
+    required this.value,
+    this.prefix = '',
+    this.suffix = '',
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.85),
-            borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: const Color(0xFF679B3B), width: 1.5),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 3,
-                offset: Offset(0, 1),
-              ),
-            ],
+            color: color.withOpacity(0.2),
+            shape: BoxShape.circle,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('🌿', style: TextStyle(fontSize: 13)),
-              const SizedBox(width: 4),
-              Text(
-                '$plotCount قطعة',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF315D25),
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          child: Icon(icon, size: 18, color: color.shade700),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$prefix$value$suffix',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
           ),
         ),
       ],
@@ -696,33 +797,110 @@ class _PlotsHeader extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  ظهور متدرّج لبطاقات الحقول
-// ═══════════════════════════════════════════════════════════════════
-class _StaggeredAppear extends StatelessWidget {
-  const _StaggeredAppear({
-    required this.index,
-    required this.controller,
-    required this.child,
-  });
-  final int index;
-  final AnimationController controller;
-  final Widget child;
+/// ==========================================
+/// 10. عنوان القسم
+/// ==========================================
+class _SectionTitle extends StatelessWidget {
+  final int totalPlots;
+  const _SectionTitle({required this.totalPlots});
 
   @override
   Widget build(BuildContext context) {
-    final delay = (index * .06).clamp(0.0, .45);
-    final end = (delay + .55).clamp(0.0, 1.0);
-    final anim = CurvedAnimation(
-      parent: controller,
-      curve: Interval(delay, end, curve: Curves.easeOutBack),
-    );
-    return FadeTransition(
-      opacity: anim,
-      child: ScaleTransition(
-        scale: Tween<double>(begin: .88, end: 1).animate(anim),
-        child: child,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4CAF50),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50).withOpacity(0.4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: const Icon(Icons.eco, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'حقول المزرعة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1B3A12),
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: Text(
+              '$totalPlots قطعة',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF2E5C1A),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// ==========================================
+/// 11. الشبكة المحسنة
+/// ==========================================
+class _OptimizedFarmGrid extends StatelessWidget {
+  final List<dynamic> plots;
+  final int crossAxisCount;
+  final void Function(int) onTap;
+
+  const _OptimizedFarmGrid({
+    required this.plots,
+    required this.crossAxisCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+      itemCount: plots.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.92,
+      ),
+      itemBuilder: (context, i) {
+        return PlotTile(
+          plot: plots[i],
+          onTap: () => onTap(i),
+        ).animate().fadeIn(
+              delay: (50 * i).ms,
+              duration: 400.ms,
+            ).scaleXY(
+              begin: 0.8,
+              end: 1.0,
+            );
+      },
     );
   }
 }
