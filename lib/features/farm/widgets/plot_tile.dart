@@ -44,12 +44,12 @@ class PlotTile extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [Color(0xFFC48B4B), AppColors.soil],
               ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: ready ? AppColors.gold : AppColors.soilDark, width: 4),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: ready ? AppColors.gold : AppColors.soilDark, width: 3),
               boxShadow: [
                 BoxShadow(
                   color: ready ? AppColors.gold.withOpacity(.7) : AppColors.soilDark,
-                  offset: const Offset(0, 5),
+                  offset: const Offset(0, 3),
                   blurRadius: ready ? 10 : 0,
                 ),
               ],
