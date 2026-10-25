@@ -9,12 +9,27 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # State Management & Local Storage
   provider: ^6.1.2
   shared_preferences: ^2.2.3
+  
+  # Firebase
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
-  flutter_animate: ^2.0.0 # للحركات المتقدمة والسهلة
+  
+  # ==========================================
+  # 🚀 التحديثات الخرافية (UI & Animations)
+  # ==========================================
+  flutter_animate: ^4.5.0          # تحديث مهم: النسخة 4+ تدعم صيغة .ms والحركات المعقدة
+  shimmer: ^3.0.0                  # تأثير اللمعان (Shimmer) للبطاقات والأزرار
+  particles_flutter: ^1.0.0        # نظام الجسيمات (عملات متطايرة، نجوم، إلخ)
+  
+  # ==========================================
+  # 🔊 الصوت والاهتزاز (Audio & Haptics)
+  # ==========================================
+  audioplayers: ^6.0.0             # لتشغيل المؤثرات الصوتية (صوت الحصاد، النقر، إلخ)
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +38,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  # ==========================================
+  # 📂 مجلدات الأصول (Assets)
+  # ==========================================
+  # ملاحظة: يجب إنشاء هذه المجلدات فعلياً في مشروعك حتى لا يحدث خطأ في البناء
+  assets:
+    - assets/sounds/    # ضع هنا ملفات الصوت (مثل: harvest.mp3, tap.mp3)
+    - assets/images/    # ضع هنا صور المزرعة والخلفيات
+    - assets/icons/     # ضع هنا الأيقونات المخصصة إن وجدت
