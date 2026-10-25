@@ -40,52 +40,61 @@ class FarmScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.watch<GameState>();
-    final crossAxisCount = MediaQuery.of(context).size.width >= 600 ? 4 : 3;
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width >= 600 ? 4 : 3;
 
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.sky, Color(0xFFBFEFFF), AppColors.grass, Color(0xFF4FA82B)],
-          stops: [0, .22, .24, 1],
+          colors: [Color(0xFFB9E9FF), Color(0xFFEAF8D9), Color(0xFF78C34B)],
+          stops: [0, .42, 1],
         ),
       ),
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const _FarmWelcomeScene(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 7, 12, 5),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 5,
+              alignment: WrapAlignment.center,
               children: [
-                Text('☁️', style: TextStyle(fontSize: 34)),
-                Text('☀️', style: TextStyle(fontSize: 40)),
-                Text('☁️', style: TextStyle(fontSize: 28)),
+                _Badge('⚡ الوقت ×${(1 / g.speedFactor).toStringAsFixed(1)}'),
+                _Badge('🌾 الحصاد ×${g.yieldMultiplier}'),
+                _Badge('🐾 الحيوانات +${g.petBonusPercent}%'),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              alignment: WrapAlignment.center,
+            padding: const EdgeInsets.fromLTRB(14, 2, 14, 7),
+            child: Row(
               children: [
-                _Badge('⚡ الوقت ×${(1 / g.speedFactor).toStringAsFixed(1)}'),
-                _Badge('💰 الحصاد ×${g.yieldMultiplier}'),
-                _Badge('🐾 حيوانات أليفة +${g.petBonusPercent}%'),
+                const Text('🌱', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 7),
+                const Expanded(
+                  child: Text('حقول مزرعتك', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF315D25))),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(.8), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF679B3B), width: 1.5)),
+                  child: Text('${g.plots.length} قطعة', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF315D25))),
+                ),
               ],
             ),
           ),
           Expanded(
             child: TickerBuilder(
               builder: (context, now) => GridView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                padding: const EdgeInsets.fromLTRB(13, 2, 13, 16),
                 itemCount: g.plots.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: .96,
                 ),
                 itemBuilder: (context, i) => PlotTile(
                   plot: g.plots[i],
@@ -95,6 +104,53 @@ class FarmScreen extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+}
+
+class _FarmWelcomeScene extends StatelessWidget {
+  const _FarmWelcomeScene();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 178,
+      margin: const EdgeInsets.fromLTRB(12, 9, 12, 0),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF805126), width: 3),
+        boxShadow: const [BoxShadow(color: Color(0x33704420), blurRadius: 7, offset: Offset(0, 4))],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF6CC7F4), Color(0xFFD8F2A4), Color(0xFF69B747)], stops: [0, .54, .55]),
+            ),
+          ),
+          Positioned(top: 7, left: 14, child: Text('☁️', style: TextStyle(fontSize: 24))),
+          Positioned(top: 17, right: 28, child: Text('☁️', style: TextStyle(fontSize: 20))),
+          Positioned(top: 48, left: 0, right: 0, child: Container(height: 2, color: const Color(0x5586A64C))),
+          Positioned(left: 14, bottom: 30, child: Text('🌳', style: TextStyle(fontSize: 43))),
+          Positioned(right: 6, bottom: 29, child: Text('🌳', style: TextStyle(fontSize: 46))),
+          Positioned(left: 60, bottom: 20, child: Text('🏡', style: TextStyle(fontSize: 68))),
+          Positioned(right: 56, bottom: 20, child: Text('🏚️', style: TextStyle(fontSize: 65))),
+          Positioned(left: 0, right: 0, bottom: 0, child: Container(height: 22, color: const Color(0xFF7A4B29))),
+          const Positioned(left: 15, bottom: 2, child: Text('🌼  🌱  🌷  🌱  🌼', style: TextStyle(fontSize: 15))),
+          const Positioned(right: 12, bottom: 2, child: Text('🌻  🌱  🌼', style: TextStyle(fontSize: 15))),
+          Positioned(left: 12, top: 10, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: const Color(0xFFFDF1D0), borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFF8B5B2D), width: 2)),
+            child: const Text('مزرعتي الجميلة', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF57391E), fontSize: 13)),
+          )),
+          const Positioned(left: 17, bottom: 27, child: Text('🐔', style: TextStyle(fontSize: 24))),
+          const Positioned(right: 103, bottom: 27, child: Text('🐄', style: TextStyle(fontSize: 27))),
+          const Positioned(right: 18, bottom: 28, child: Text('🐑', style: TextStyle(fontSize: 23))),
         ],
       ),
     );
