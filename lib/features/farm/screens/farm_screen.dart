@@ -84,10 +84,10 @@ class FarmScreen extends StatelessWidget {
             child: wide
               ? Row(children: [
                   Expanded(flex: 6, child: plots),
-                  Expanded(flex: 4, child: _AnimalPasture(animals: _ownedAnimals(g.animals))),
+                  Expanded(flex: 4, child: _AnimalPasture(owned: g.animals)),
                 ])
               : Column(children: [
-                  SizedBox(height: 94, child: _AnimalPasture(animals: _ownedAnimals(g.animals))),
+                  SizedBox(height: 94, child: _AnimalPasture(owned: g.animals)),
                   Expanded(child: plots),
                 ]),
           ),
@@ -97,15 +97,11 @@ class FarmScreen extends StatelessWidget {
     );
   }
 
-  List<Animal> _ownedAnimals(Map<String, int> owned) => [
-    for (final animal in [...ShopData.productiveAnimals, ...ShopData.petAnimals])
-      if ((owned[animal.id] ?? 0) > 0) animal,
-  ];
 }
 
 class _AnimalPasture extends StatefulWidget {
-  const _AnimalPasture({required this.animals});
-  final List<Animal> animals;
+  const _AnimalPasture({required this.owned});
+  final Map<String, int> owned;
 
   @override
   State<_AnimalPasture> createState() => _AnimalPastureState();
@@ -121,8 +117,18 @@ class _AnimalPastureState extends State<_AnimalPasture> with SingleTickerProvide
 
   @override
   Widget build(BuildContext context) {
+    final catalog = [...ShopData.productiveAnimals, ...ShopData.petAnimals];
+    final herd = <Animal>[];
+    for (final animal in catalog) {
+      final count = widget.owned[animal.id] ?? 0;
+      for (var i = 0; i < count && herd.length < 14; i++) {
+        herd.add(animal);
+      }
+    }
+    final totalOwned = widget.owned.values.fold<int>(0, (sum, value) => sum + value);
     return Container(
       margin: const EdgeInsets.fromLTRB(6, 4, 10, 8),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -131,36 +137,65 @@ class _AnimalPastureState extends State<_AnimalPasture> with SingleTickerProvide
         boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 5, offset: Offset(0, 3))],
       ),
       child: Stack(children: [
-        Positioned(top: 8, left: 12, child: Text('🌳', style: TextStyle(fontSize: 25))),
-        Positioned(bottom: 8, right: 12, child: Text('🌼  🌱  🌼', style: TextStyle(fontSize: 15))),
+        Positioned.fill(child: CustomPaint(painter: _PastureDetailsPainter())),
         Positioned(top: 8, right: 12, child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(.9), borderRadius: BorderRadius.circular(12)),
-          child: Text(widget.animals.isEmpty ? 'حظيرة الحيوانات' : 'حيواناتي • ${widget.animals.length} أنواع',
+          decoration: BoxDecoration(color: const Color(0xFFFDF1D0), border: Border.all(color: const Color(0xFF79522D), width: 2), borderRadius: BorderRadius.circular(5)),
+          child: Text(herd.isEmpty ? 'حظيرة الحيوانات' : 'حيواناتي • $totalOwned',
             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: AppColors.dark)),
         )),
-        if (widget.animals.isEmpty)
+        if (herd.isEmpty)
           const Center(child: Text('اشترِ حيواناً من السوق ليعيش هنا 🐄', textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)))
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white, shadows: AppTheme.outline)))
         else
           AnimatedBuilder(animation: _walk, builder: (context, _) {
-            final shift = (_walk.value - .5) * 22;
-            return Align(
-              alignment: Alignment(-.78 + _walk.value * 1.35, .35),
-              child: Transform.translate(
-                offset: Offset(shift, 0),
-                child: Wrap(spacing: 12, children: widget.animals.take(5).map((a) => _WalkingAnimal(animal: a)).toList()),
-              ),
-            );
+            return LayoutBuilder(builder: (context, constraints) => Stack(children: [
+              for (var i = 0; i < herd.length; i++)
+                Positioned(
+                  left: 8 + ((i * 37.0 + _walk.value * (i.isEven ? 26 : -19)).abs() % 100) / 100 * (constraints.maxWidth - 48).clamp(0.0, double.infinity).toDouble(),
+                  top: 22 + ((i * 29.0 + _walk.value * (i.isOdd ? 22 : -13)).abs() % 100) / 100 * (constraints.maxHeight - 58).clamp(0.0, double.infinity).toDouble(),
+                  child: _WalkingAnimal(animal: herd[i], phase: i * .19),
+                ),
+            ]));
           }),
+        Positioned(left: 10, bottom: 8, child: Container(width: 36, height: 13, decoration: BoxDecoration(color: const Color(0xFF6AAED0), border: Border.all(color: const Color(0xFF426E46), width: 2)))),
       ]),
     );
   }
 }
 
+class _PastureDetailsPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..isAntiAlias = false;
+    for (var i = 0; i < 48; i++) {
+      final x = ((i * 47) % 997) / 997 * size.width;
+      final y = ((i * 71 + 23) % 991) / 991 * size.height;
+      p.color = i % 3 == 0 ? const Color(0xFF4C963F) : const Color(0xFF9ACD5D);
+      canvas.drawRect(Rect.fromLTWH(x, y, 3, 5), p);
+      if (i % 7 == 0) {
+        p.color = const Color(0xFFFFE58A);
+        canvas.drawRect(Rect.fromLTWH(x + 3, y - 2, 3, 3), p);
+      }
+    }
+    p.color = const Color(0xFF87552F);
+    canvas.drawRect(Rect.fromLTWH(0, 3, size.width, 4), p);
+    canvas.drawRect(Rect.fromLTWH(0, 12, size.width, 4), p);
+    for (var x = 5.0; x < size.width; x += 25) {
+      p.color = const Color(0xFF704323);
+      canvas.drawRect(Rect.fromLTWH(x, 0, 5, 20), p);
+      p.color = const Color(0xFFBA8247);
+      canvas.drawRect(Rect.fromLTWH(x + 1, 1, 2, 17), p);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _WalkingAnimal extends StatefulWidget {
-  const _WalkingAnimal({required this.animal});
+  const _WalkingAnimal({required this.animal, this.phase = 0});
   final Animal animal;
+  final double phase;
   @override
   State<_WalkingAnimal> createState() => _WalkingAnimalState();
 }
@@ -170,7 +205,7 @@ class _WalkingAnimalState extends State<_WalkingAnimal> with SingleTickerProvide
   void dispose() { _bounce.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) => AnimatedBuilder(animation: _bounce, builder: (context, child) => Transform.translate(
-    offset: Offset(0, -_bounce.value * 3), child: child,
+    offset: Offset(((_bounce.value + widget.phase) % 1 - .5) * 2, -((_bounce.value + widget.phase) % 1) * 3), child: child,
   ), child: Column(mainAxisSize: MainAxisSize.min, children: [
     Text(widget.animal.emoji, style: const TextStyle(fontSize: 29)),
     Container(width: 22, height: 5, decoration: BoxDecoration(color: Colors.black.withOpacity(.2), borderRadius: BorderRadius.circular(8))),
