@@ -4,30 +4,30 @@ import '../models/tool_item.dart';
 
 class ShopData {
   static const List<Crop> crops = [
-    Crop(id: 'wheat', name: 'القمح', emoji: '🌾', price: 10000, requiredLevel: 1, growSeconds: 10),
-    Crop(id: 'corn', name: 'الذرة', emoji: '🌽', price: 25000, requiredLevel: 3, growSeconds: 20),
-    Crop(id: 'carrot', name: 'الجزر', emoji: '🥕', price: 57000, requiredLevel: 5, growSeconds: 30),
-    Crop(id: 'cucumber', name: 'الخيار', emoji: '🥒', price: 123000, requiredLevel: 7, growSeconds: 40),
-    Crop(id: 'tomato', name: 'الطماطم', emoji: '🍅', price: 257000, requiredLevel: 10, growSeconds: 60),
-    Crop(id: 'potato', name: 'البطاطس', emoji: '🥔', price: 527000, requiredLevel: 14, growSeconds: 90),
-    Crop(id: 'lemon', name: 'الليمون', emoji: '🍋', price: 1300000, requiredLevel: 18, growSeconds: 120),
-    Crop(id: 'apple', name: 'التفاح', emoji: '🍎', price: 2680000, requiredLevel: 25, growSeconds: 180),
-    Crop(id: 'orange', name: 'البرتقال', emoji: '🍊', price: 5560000, requiredLevel: 30, growSeconds: 240),
-    Crop(id: 'grape', name: 'العنب', emoji: '🍇', price: 11320000, requiredLevel: 37, growSeconds: 300),
-    Crop(id: 'strawberry', name: 'الفراولة', emoji: '🍓', price: 22950000, requiredLevel: 45, growSeconds: 400),
-    Crop(id: 'berry', name: 'التوت', emoji: '🫐', price: 46200000, requiredLevel: 60, growSeconds: 500),
-    Crop(id: 'cherry', name: 'الكرز', emoji: '🍒', price: 135000000, requiredLevel: 75, growSeconds: 600),
-    Crop(id: 'pineapple', name: 'الأناناس', emoji: '🍍', price: 340000000, requiredLevel: 100, growSeconds: 800),
-    Crop(id: 'coconut', name: 'جوز الهند', emoji: '🥥', price: 1000000000, requiredLevel: 120, growSeconds: 1000),
+    Crop(id: 'wheat', name: 'القمح', emoji: '🌾', price: 10000, requiredLevel: 1, growSeconds: 60),
+    Crop(id: 'corn', name: 'الذرة', emoji: '🌽', price: 25000, requiredLevel: 3, growSeconds: 120),
+    Crop(id: 'carrot', name: 'الجزر', emoji: '🥕', price: 57000, requiredLevel: 5, growSeconds: 180),
+    Crop(id: 'cucumber', name: 'الخيار', emoji: '🥒', price: 123000, requiredLevel: 7, growSeconds: 240),
+    Crop(id: 'tomato', name: 'الطماطم', emoji: '🍅', price: 257000, requiredLevel: 10, growSeconds: 300),
+    Crop(id: 'potato', name: 'البطاطس', emoji: '🥔', price: 527000, requiredLevel: 14, growSeconds: 420),
+    Crop(id: 'lemon', name: 'الليمون', emoji: '🍋', price: 1800000, requiredLevel: 18, growSeconds: 600),
+    Crop(id: 'apple', name: 'التفاح', emoji: '🍎', price: 3000000, requiredLevel: 25, growSeconds: 900),
+    Crop(id: 'orange', name: 'البرتقال', emoji: '🍊', price: 5000000, requiredLevel: 30, growSeconds: 1200),
+    Crop(id: 'grape', name: 'العنب', emoji: '🍇', price: 8000000, requiredLevel: 37, growSeconds: 1800),
+    Crop(id: 'strawberry', name: 'الفراولة', emoji: '🍓', price: 12000000, requiredLevel: 45, growSeconds: 2400),
+    Crop(id: 'berry', name: 'التوت', emoji: '🫐', price: 18000000, requiredLevel: 60, growSeconds: 3000),
+    Crop(id: 'cherry', name: 'الكرز', emoji: '🍒', price: 65000000, requiredLevel: 75, growSeconds: 3600),
+    Crop(id: 'pineapple', name: 'الأناناس', emoji: '🍍', price: 90000000, requiredLevel: 100, growSeconds: 5400),
+    Crop(id: 'coconut', name: 'جوز الهند', emoji: '🥥', price: 125000000, requiredLevel: 120, growSeconds: 7200),
   ];
 
   static const List<Animal> productiveAnimals = [
-    Animal(id: 'chicken', name: 'الدجاج', emoji: '🐔', price: 100000, cycleSeconds: 30),
-    Animal(id: 'cow', name: 'البقر', emoji: '🐄', price: 250000, cycleSeconds: 45),
-    Animal(id: 'sheep', name: 'الغنم', emoji: '🐑', price: 750000, cycleSeconds: 60),
-    Animal(id: 'fish', name: 'السمك', emoji: '🐟', price: 1500000, cycleSeconds: 60),
-    Animal(id: 'birds', name: 'الطيور', emoji: '🦜', price: 2000000, cycleSeconds: 60),
-    Animal(id: 'bees', name: 'النحل', emoji: '🐝', price: 1000000, cycleSeconds: 45),
+    Animal(id: 'chicken', name: 'الدجاج', emoji: '🐔', price: 100000, cycleSeconds: 300),
+    Animal(id: 'cow', name: 'البقر', emoji: '🐄', price: 250000, cycleSeconds: 600),
+    Animal(id: 'sheep', name: 'الغنم', emoji: '🐑', price: 750000, cycleSeconds: 900),
+    Animal(id: 'fish', name: 'السمك', emoji: '🐟', price: 1500000, cycleSeconds: 900),
+    Animal(id: 'birds', name: 'الطيور', emoji: '🦜', price: 2000000, cycleSeconds: 900),
+    Animal(id: 'bees', name: 'النحل', emoji: '🐝', price: 1000000, cycleSeconds: 600),
   ];
 
   static const List<Animal> petAnimals = [
