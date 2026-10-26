@@ -19,6 +19,6 @@ class Animal {
   /// نسبة زيادة أرباح الحصاد لكل حيوان أليف
   final int petBonusPercent;
 
-  /// دخل الدورة الواحدة للحيوان الإنتاجي (5% من سعره)
-  int get incomePerCycle => isProductive ? (price * 0.05).round() : 0;
+  /// دخل الدورة الواحدة للحيوان الإنتاجي (1% من سعره لتقليل التضخم)
+  int get incomePerCycle => isProductive ? (price * 0.01).round() : 0;
 }
