@@ -18,7 +18,7 @@ class Crop {
   final int growSeconds;
 
   /// سعر بيع المحصول (150% من سعر البذرة)
-  int get sellPrice => (price * 1.5).round();
+  int get sellPrice => (price * 1.15).round();
 
   /// الخبرة المكتسبة عند الحصاد
   int get xpReward => 10 + requiredLevel * 3;
