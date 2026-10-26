@@ -11,7 +11,7 @@ import '../../game/state/game_state.dart';
 import '../widgets/seed_picker.dart';
 
 // ==========================================
-// الشاشة الرئيسية: مزرعة بمستوى ألعاب AAA
+// الشاشة الرئيسية: مزرعة بمستوى ألعاب AAA (مصححة)
 // ==========================================
 class FarmScreen extends StatefulWidget {
   const FarmScreen({super.key});
@@ -49,7 +49,7 @@ class _FarmScreenState extends State<FarmScreen> with TickerProviderStateMixin {
         context: context,
         backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (_) => const SeedPicker(plotIndex: 0), // عدل الـ index حسب حاجتك
+        builder: (_) => SeedPicker(plotIndex: index),
       );
       return;
     }
@@ -58,8 +58,6 @@ class _FarmScreenState extends State<FarmScreen> with TickerProviderStateMixin {
       HapticFeedback.mediumImpact();
       final result = gameState.harvest(index);
       if (result != null) {
-        _showFloatingReward(context, result.income, result.xp);
-        
         final levelUpMsg = result.levelsGained > 0
             ? '\n🎉 مستوى جديد: ${gameState.level}!'
             : '';
@@ -75,12 +73,6 @@ class _FarmScreenState extends State<FarmScreen> with TickerProviderStateMixin {
 
     HapticFeedback.lightImpact();
     showToast(context, 'المحصول ينمو... انتظر قليلاً ⏳', color: Colors.orange);
-  }
-
-  // تأثير طفو المكافأة (بدون مكتبات خارجية)
-  void _showFloatingReward(BuildContext context, int income, int xp) {
-    // يمكن تطوير هذا لاحقاً ليظهر فوق الحقل المحدد
-    // حالياً نكتفي بـ Toast المحسن والاهتزاز
   }
 
   @override
@@ -183,7 +175,7 @@ class _PremiumGameHUD extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'مزرعتك',
+                    'رصيدك',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -195,8 +187,9 @@ class _PremiumGameHUD extends StatelessWidget {
                     children: [
                       const Icon(Icons.currency_exchange, color: Color(0xFF2E7D32), size: 20),
                       const SizedBox(width: 4),
+                      // ملاحظة: إذا كان اسم المتغير في GameState الخاص بك هو money أو iqd، غيّر gameState.gold إليه
                       Text(
-                        formatIqd(gameState.gold), // افترضت وجود gold في gameState، عدلها لـ income إذا لزم الأمر
+                        formatIqd(gameState.gold), 
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
@@ -208,7 +201,7 @@ class _PremiumGameHUD extends StatelessWidget {
                 ],
               ),
             ),
-            // زر المكافآت اليومية (مثال)
+            // زر المكافآت اليومية
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -247,7 +240,7 @@ class _OrganicFarmGrid extends StatelessWidget {
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.85, // جعل الحقل أطول قليلاً ليبدو كحوض زراعة
+        childAspectRatio: 0.85,
       ),
       itemBuilder: (context, i) {
         return _PremiumPlotTile(
@@ -260,7 +253,7 @@ class _OrganicFarmGrid extends StatelessWidget {
 }
 
 // ==========================================
-// 3. الحقل الاحترافي (جوهر التصميم)
+// 3. الحقل الاحترافي (مصحح)
 // ==========================================
 class _PremiumPlotTile extends StatelessWidget {
   final dynamic plot;
@@ -293,13 +286,8 @@ class _PremiumPlotTile extends StatelessWidget {
               blurRadius: isReady ? 20 : 12,
               offset: Offset(0, isReady ? 8 : 4),
             ),
-            // ظل داخلي لإعطاء عمق (تأثير الحوض)
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-              inset: true,
-            ),
+            // تم إزالة inset: true لأنه غير مدعوم في Flutter BoxShadow
+            // نعوض عنه بحدود خفيفة تعطي عمقاً
           ],
           border: Border.all(
             color: isReady ? const Color(0xFFFFD700) : Colors.white.withOpacity(0.5),
@@ -310,8 +298,7 @@ class _PremiumPlotTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           child: Stack(
             children: [
-              // نمط خلفية التربة
-              if (!isEmpty) _SoilPattern(),
+              if (!isEmpty) const _SoilPattern(),
               
               Center(
                 child: Column(
@@ -319,13 +306,12 @@ class _PremiumPlotTile extends StatelessWidget {
                   children: [
                     _buildPlotIcon(isEmpty, isReady),
                     const SizedBox(height: 12),
-                    _buildPlotText(isEmpty, isReady, plot),
-                    if (!isEmpty && !isReady) _buildGrowthBar(plot, now),
+                    _buildPlotText(isEmpty, isReady),
+                    if (!isEmpty && !isReady) _buildGrowthBar(plot),
                   ],
                 ),
               ),
 
-              // تأثير الوميض عند الجاهزية
               if (isReady)
                 Positioned.fill(
                   child: Container(
@@ -349,9 +335,9 @@ class _PremiumPlotTile extends StatelessWidget {
   }
 
   List<Color> _getPlotColors(bool isEmpty, bool isReady) {
-    if (isEmpty) return [const Color(0xFFD7CCC8), const Color(0xFFBCAAA4)];
-    if (isReady) return [const Color(0xFF66BB6A), const Color(0xFF43A047)];
-    return [const Color(0xFF8D6E63), const Color(0xFF6D4C41)]; // تربة رطبة
+    if (isEmpty) return const [Color(0xFFD7CCC8), Color(0xFFBCAAA4)];
+    if (isReady) return const [Color(0xFF66BB6A), Color(0xFF43A047)];
+    return const [Color(0xFF8D6E63), Color(0xFF6D4C41)];
   }
 
   Color _getShadowColor(bool isEmpty, bool isReady) {
@@ -372,7 +358,8 @@ class _PremiumPlotTile extends StatelessWidget {
       );
     }
     
-    final icon = isReady ? Icons.eco : Icons.sprout;
+    // تم التصحيح هنا: استبدال Icons.sprout بـ Icons.grass
+    final icon = isReady ? Icons.eco : Icons.grass;
     final color = isReady ? Colors.white : const Color(0xFFA5D6A7);
     
     return Icon(icon, color: color, size: 48).animate(
@@ -380,7 +367,7 @@ class _PremiumPlotTile extends StatelessWidget {
     ).scaleXY(begin: 1.0, end: 1.1, duration: 1000.ms);
   }
 
-  Widget _buildPlotText(bool isEmpty, bool isReady, dynamic plot) {
+  Widget _buildPlotText(bool isEmpty, bool isReady) {
     if (isEmpty) {
       return const Text('فارغ', style: TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.w700, fontSize: 14));
     }
@@ -390,10 +377,9 @@ class _PremiumPlotTile extends StatelessWidget {
     return const Text('ينمو...', style: TextStyle(color: Color(0xFFE8F5E9), fontWeight: FontWeight.w600, fontSize: 13));
   }
 
-  Widget _buildGrowthBar(dynamic plot, DateTime now) {
-    // حساب نسبة النمو (افتراضي، عدله حسب منطق GameState الخاص بك)
-    // مثال: double progress = plot.progress ?? 0.5;
-    const double progress = 0.65; // قيمة تجريبية للعرض
+  Widget _buildGrowthBar(dynamic plot) {
+    // قيمة تجريبية، يمكنك ربطها بمنطق التقدم الفعلي في gameState
+    const double progress = 0.65; 
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -411,9 +397,11 @@ class _PremiumPlotTile extends StatelessWidget {
 }
 
 // ==========================================
-// 4. نمط التربة (تفصيل مخضرم)
+// 4. نمط التربة
 // ==========================================
 class _SoilPattern extends StatelessWidget {
+  const _SoilPattern();
+
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
