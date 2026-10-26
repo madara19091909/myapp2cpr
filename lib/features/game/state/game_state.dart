@@ -23,10 +23,10 @@ class HarvestResult {
 class GameState extends ChangeNotifier {
   static const _saveKey = 'farm_party_save_v1';
   static const int maxStoredCycles = 10;
-  static const int levelUpGoldReward = 5;
+  static const int levelUpGoldReward = 2;
 
   String playerName = 'المزارع';
-  int money = 200000; // الدينار العراقي
+  int money = 50000; // الدينار العراقي
   int gold = 50; // العملات الذهبية
   int xp = 0;
   int level = 1;
@@ -62,10 +62,10 @@ class GameState extends ChangeNotifier {
     final yesterday = _dateKey(now.subtract(const Duration(days: 1)));
     dailyStreak = lastDailyRewardDate == yesterday ? dailyStreak + 1 : 1;
     if (dailyStreak > 7) dailyStreak = 7;
-    final cashReward = 15000 + (dailyStreak - 1) * 5000;
-    final goldReward = dailyStreak == 7 ? 5 : 1;
-    money += cashReward;
-    gold += goldReward;
+    final cashReward = 2000 + (dailyStreak - 1) * 500;
+    final goldReward = dailyStreak == 7 ? 2 : 0;
+    money = (money + cashReward).clamp(0, 2000000000);
+    gold = (gold + goldReward).clamp(0, 1000000);
     lastDailyRewardDate = _dateKey(now);
     _record('المكافأة اليومية', 'اليوم $dailyStreak من 7', moneyDelta: cashReward, goldDelta: goldReward);
     _commit();
@@ -82,7 +82,7 @@ class GameState extends ChangeNotifier {
     return f;
   }
 
-  int get yieldMultiplier => tools.contains('pickaxe') ? 2 : 1;
+  int get yieldMultiplier => tools.contains('pickaxe') ? 1 : 1;
 
   int get petBonusPercent {
     var total = 0;
@@ -119,7 +119,7 @@ class GameState extends ChangeNotifier {
     final unitPrice = (crop.price * 0.6).floor();
     if (unitPrice < 1) return 'لا يمكن بيع هذا العنصر حالياً';
     seeds[crop.id] = owned - qty;
-    money += unitPrice * qty;
+    money = (money + unitPrice * qty).clamp(0, 2000000000);
     _record('بيع بذور', '$qty × ${crop.name}', moneyDelta: unitPrice * qty);
     _commit();
     return null;
@@ -149,7 +149,7 @@ class GameState extends ChangeNotifier {
       animals.remove(animal.id);
       _lastCollect.remove(animal.id);
     }
-    money += refund;
+    money = (money + refund).clamp(0, 2000000000);
     _record('بيع حيوان', '$qty × ${animal.name}', moneyDelta: refund);
     _commit();
     return null;
@@ -184,7 +184,7 @@ class GameState extends ChangeNotifier {
     final crop = ShopData.cropById(plot.cropId!);
     final base = crop.sellPrice * yieldMultiplier;
     final income = (base * (100 + petBonusPercent) / 100).round();
-    money += income;
+    money = (money + income).clamp(0, 2000000000);
     _record('بيع محصول الحصاد', crop.name, moneyDelta: income);
     plot.clear();
     final gained = _addXp(crop.xpReward);
@@ -220,7 +220,7 @@ class GameState extends ChangeNotifier {
     final cycles = pendingCycles(animal, now);
     if (cycles == 0) return 0;
     final income = cycles * animal.incomePerCycle * ownedAnimals(animal.id);
-    money += income;
+    money = (money + income).clamp(0, 2000000000);
     _record('تحصيل إنتاج الحيوانات', animal.name, moneyDelta: income);
     final last = _lastCollect[animal.id] ?? now;
     _lastCollect[animal.id] = cycles >= maxStoredCycles
@@ -271,7 +271,7 @@ class GameState extends ChangeNotifier {
 
   void _resetToDefaults() {
     playerName = 'المزارع';
-    money = 200000;
+    money = 50000;
     gold = 50;
     xp = 0;
     level = 1;
@@ -289,9 +289,9 @@ class GameState extends ChangeNotifier {
 
   void _applyMap(Map<String, dynamic> m) {
     playerName = (m['name'] as String?) ?? playerName;
-    money = ((m['money'] as num?)?.toInt() ?? money).clamp(0, 9000000000000000).toInt();
-    gold = ((m['gold'] as num?)?.toInt() ?? gold).clamp(0, 9000000000000000).toInt();
-    xp = ((m['xp'] as num?)?.toInt() ?? xp).clamp(0, 9000000000000000).toInt();
+    money = ((m['money'] as num?)?.toInt() ?? money).clamp(0, 2000000000).toInt();
+    gold = ((m['gold'] as num?)?.toInt() ?? gold).clamp(0, 1000000).toInt();
+    xp = ((m['xp'] as num?)?.toInt() ?? xp).clamp(0, 1000000000).toInt();
     level = ((m['level'] as num?)?.toInt() ?? level).clamp(1, 1000000).toInt();
     seeds
       ..clear()
