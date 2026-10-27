@@ -106,7 +106,7 @@ class ShopEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-    decoration: BoxDecoration(color: Colors.white.withOpacity(.8), borderRadius: BorderRadius.circular(22), border: Border.all(color: AppColors.outline)),
+    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .8), borderRadius: BorderRadius.circular(22), border: Border.all(color: AppColors.outline)),
     child: Column(children: [
       const Text('🔎', style: TextStyle(fontSize: 42)),
       const SizedBox(height: 8),
