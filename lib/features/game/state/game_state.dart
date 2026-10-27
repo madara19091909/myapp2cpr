@@ -214,9 +214,9 @@ class GameState extends ChangeNotifier {
 
   int ownedSeeds(String id) => seeds[id] ?? 0;
   int storedCrop(String id) => harvestedCrops[id] ?? 0;
-  int get totalStoredCrops => harvestedCrops.values.fold<int>(0, (sum, qty) => sum + qty);
-  int get totalSeedCount => seeds.values.fold<int>(0, (sum, qty) => sum + qty);
-  int get totalAnimalCount => animals.values.fold<int>(0, (sum, qty) => sum + qty);
+  int get totalStoredCrops => harvestedCrops.values.fold<int>(0, (total, qty) => total + qty);
+  int get totalSeedCount => seeds.values.fold<int>(0, (total, qty) => total + qty);
+  int get totalAnimalCount => animals.values.fold<int>(0, (total, qty) => total + qty);
   int ownedAnimals(String id) => animals[id] ?? 0;
   int boostedCycles(String id) => _boostedCycles[id] ?? 0;
   static const int animalFeedPackSize = 5;
@@ -528,7 +528,7 @@ class GameState extends ChangeNotifier {
     if (requested < 1) return 'تعذر حساب سعر البيع';
     if (requested > 2000000000 - money) return 'رصيدك قريب من الحد الأقصى؛ اصرف جزءاً من الرصيد قبل البيع';
     harvestedCrops[item.id] = owned - qty;
-    if (harvestedCrops[item.id] <= 0) harvestedCrops.remove(item.id);
+    if ((harvestedCrops[item.id] ?? 0) <= 0) harvestedCrops.remove(item.id);
     _trackProgress('sold', qty);
     final credited = _creditMoney(requested);
     _record('بيع محاصيل مخزونة', '${item.emoji} ${item.name} ×$qty', moneyDelta: credited);
@@ -549,9 +549,9 @@ class GameState extends ChangeNotifier {
     if (sold.isEmpty) return 'ما عندك محاصيل صالحة للبيع';
     if (totalRequested > 2000000000 - money) return 'قيمة المحاصيل تتجاوز المساحة المتبقية في رصيدك؛ بع المحاصيل على دفعات';
     harvestedCrops.clear();
-    _trackProgress('sold', sold.values.fold<int>(0, (sum, qty) => sum + qty));
+    _trackProgress('sold', sold.values.fold<int>(0, (total, qty) => total + qty));
     final credited = _creditMoney(totalRequested);
-    _record('بيع كل المحاصيل المخزونة', '${sold.values.fold<int>(0, (sum, qty) => sum + qty)} محصول', moneyDelta: credited);
+    _record('بيع كل المحاصيل المخزونة', '${sold.values.fold<int>(0, (total, qty) => total + qty)} محصول', moneyDelta: credited);
     _commit();
     return null;
   }
@@ -560,7 +560,9 @@ class GameState extends ChangeNotifier {
   int pendingCycles(Animal animal, DateTime now) {
     final item = ShopData.tryAnimalById(animal.id);
     if (item == null || !item.isProductive || item.cycleSeconds < 1 ||
-        ownedAnimals(item.id) == 0) return 0;
+        ownedAnimals(item.id) == 0) {
+      return 0;
+    }
     final last = _lastCollect[item.id] ?? now;
     final elapsedSeconds = now.difference(last).inSeconds;
     if (elapsedSeconds <= 0) return 0;
@@ -774,8 +776,7 @@ class GameState extends ChangeNotifier {
     // Old saves receive a small starter water supply for the new farming mechanic.
     waterUnits = ((m['waterUnits'] is num ? (m['waterUnits'] as num).toInt() : 5))
         .clamp(0, 1000000).toInt();
-    _boostedCycles
-      ..clear();
+    _boostedCycles.clear();
     final savedBoosts = m['boostedCycles'];
     if (savedBoosts is Map) {
       for (final entry in savedBoosts.entries) {
@@ -814,8 +815,7 @@ class GameState extends ChangeNotifier {
             : 0))
         .clamp(0, 7).toInt();
     dailyProgressDate = m['dailyProgressDate'] is String ? m['dailyProgressDate'] as String : _dateKey(DateTime.now());
-    dailyProgress
-      ..clear();
+    dailyProgress.clear();
     final savedDailyProgress = m['dailyProgress'];
     if (savedDailyProgress is Map) {
       for (final entry in savedDailyProgress.entries) {
@@ -825,8 +825,7 @@ class GameState extends ChangeNotifier {
     claimedDailyMissions
       ..clear()
       ..addAll(m['claimedDailyMissions'] is List ? (m['claimedDailyMissions'] as List).map((v) => v.toString()) : const <String>[]);
-    lifetimeStats
-      ..clear();
+    lifetimeStats.clear();
     final savedLifetimeStats = m['lifetimeStats'];
     if (savedLifetimeStats is Map) {
       for (final entry in savedLifetimeStats.entries) {
