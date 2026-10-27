@@ -149,7 +149,7 @@ class _RoundBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        constraints: BoxConstraints(minWidth: 40, minHeight: 40),
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
         padding: EdgeInsets.symmetric(horizontal: wide ? 10 : 0),
         alignment: Alignment.center,
         decoration: BoxDecoration(
