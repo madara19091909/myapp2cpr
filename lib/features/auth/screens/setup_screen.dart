@@ -9,15 +9,15 @@ class SetupScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(20),
             child: CartoonCard(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text('⚙️', style: TextStyle(fontSize: 56)),
                   SizedBox(height: 8),
                   Text('إعدادات Firebase ناقصة',
