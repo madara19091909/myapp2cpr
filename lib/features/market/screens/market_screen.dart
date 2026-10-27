@@ -48,7 +48,7 @@ class _MarketScreenState extends State<MarketScreen> {
           const SizedBox(height: 5),
           Text('تابع أرباحك واستلم مكافآتك اليومية',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.dark.withOpacity(.72), fontWeight: FontWeight.w600)),
+              style: TextStyle(color: AppColors.dark.withValues(alpha: .72), fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
           _DailyRewardCard(game: game),
           const SizedBox(height: 14),
@@ -107,7 +107,7 @@ class _DailyMarketBoard extends StatelessWidget {
         ]),
         const SizedBox(height: 4),
         Text('الأسعار تتجدد يومياً ضمن نطاق 85%–120% من السعر الأساسي. السعر يشمل مكافأة الحيوانات الأليفة؛ المعول يزيد كمية الحصاد.',
-          style: TextStyle(fontSize: 11, color: AppColors.dark.withOpacity(.68), height: 1.35)),
+          style: TextStyle(fontSize: 11, color: AppColors.dark.withValues(alpha: .68), height: 1.35)),
         const SizedBox(height: 8),
         Text('تاريخ السوق: ${date.day}/${date.month}/${date.year}',
           style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w700)),
@@ -155,7 +155,7 @@ class _DailyRewardCard extends StatelessWidget {
         Row(children: List.generate(7, (i) => Expanded(child: Container(
           margin: const EdgeInsetsDirectional.only(end: 4),
           padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(color: i < game.dailyStreak ? AppColors.gold : Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withOpacity(.65))),
+          decoration: BoxDecoration(color: i < game.dailyStreak ? AppColors.gold : Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: .65))),
           child: Text('${i + 1}', textAlign: TextAlign.center, style: TextStyle(color: i < game.dailyStreak ? AppColors.dark : Colors.white, fontWeight: FontWeight.w900)),
         )))),
         const SizedBox(height: 14),
@@ -188,7 +188,7 @@ class _TransactionTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(.9), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.soil.withOpacity(.55)), boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))]),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.soil.withValues(alpha: .55)), boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))]),
       child: Row(children: [
         Container(width: 42, height: 42, alignment: Alignment.center, decoration: BoxDecoration(color: positive ? const Color(0xFFE3F5D9) : const Color(0xFFFFE8D2), borderRadius: BorderRadius.circular(13)), child: Text(positive ? '📈' : '🛒', style: const TextStyle(fontSize: 22))),
         const SizedBox(width: 11),
