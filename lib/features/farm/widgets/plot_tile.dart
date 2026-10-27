@@ -57,7 +57,7 @@ class PlotTile extends StatelessWidget {
                   border: Border.all(color: ready ? AppColors.gold : AppColors.soilDark, width: ready ? 3 : 2),
                   boxShadow: [
                     BoxShadow(
-                      color: ready ? AppColors.gold.withOpacity(.65) : const Color(0x33000000),
+                      color: ready ? AppColors.gold.withValues(alpha: .65) : const Color(0x33000000),
                       offset: const Offset(0, 4),
                       blurRadius: ready ? 8 : 3,
                     ),
