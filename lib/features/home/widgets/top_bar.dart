@@ -122,7 +122,7 @@ class _StatChip extends StatelessWidget {
       height: 35,
       padding: const EdgeInsets.symmetric(horizontal: 7),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.32),
+        color: Colors.black.withValues(alpha: .32),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.gold, width: 1.5),
       ),
