@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validSave(data) {
+      return data.keys().hasOnly([
+        'name', 'money', 'gold', 'xp', 'level', 'seeds', 'harvestedCrops',
+        'animals', 'animalFeed', 'waterUnits', 'boostedCycles', 'tools',
+        'transactions', 'lastDailyRewardDate', 'dailyStreak', 'dailyProgressDate',
+        'dailyProgress', 'claimedDailyMissions', 'lifetimeStats',
+        'claimedAchievements', 'collect', 'plots', 'updated'
+      ])
+      && data.name is string && data.name.size() <= 24
+      && data.money is int && data.money >= 0 && data.money <= 2000000000
+      && data.gold is int && data.gold >= 0 && data.gold <= 1000000
+      && data.xp is int && data.xp >= 0 && data.xp <= 1000000000
+      && data.level is int && data.level >= 1 && data.level <= 1000000
+      && data.plots is list && data.plots.size() <= 24
+      && data.updated is int;
+    }
+
+    match /users/{uid} {
+      // Owner-only and schema/range validation. This is NOT cheat-proof economy:
+      // a player can still submit a different valid balance for their own document.
+      // Before competitive launch, move currency and reward mutations to trusted functions
+      // and remove client write access to authoritative economy fields.
+      allow read: if owns(uid);
+      allow create, update: if owns(uid) && validSave(request.resource.data);
+      allow delete: if false;
+
+      match /friends/{friendUid} {
+        allow read, delete: if owns(uid);
+        allow create: if owns(uid)
+          && friendUid != uid
+          && request.resource.data.keys().hasOnly(['uid', 'addedAt'])
+          && request.resource.data.uid == friendUid;
+        allow update: if false;
+      }
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if signedIn();
+      // Public profile fields are display snapshots, not authoritative ranking values.
+      // Client-side values can be forged until a trusted backend publishes them.
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'name', 'level', 'money', 'farmPlots', 'updated'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.level is int
+        && request.resource.data.level >= 1
+        && request.resource.data.level <= 1000000
+        && request.resource.data.money is int
+        && request.resource.data.money >= 0
+        && request.resource.data.money <= 2000000000
+        && request.resource.data.updated is int
+        && request.resource.data.farmPlots is list
+        && request.resource.data.farmPlots.size() <= 24;
+      allow delete: if false;
+    }
+  }
+}
