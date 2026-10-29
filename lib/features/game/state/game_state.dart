@@ -723,7 +723,7 @@ class GameState extends ChangeNotifier {
     final capped = hours.clamp(2, 24);
     final cash = (level * 400 * capped).clamp(0, 200000);
     final credited = _creditMoney(cash);
-    lastOfflineRewardMessage = 'مرحباً بعودتك! حصلت على ${credited} دينار عن $capped ساعة غياب';
+    lastOfflineRewardMessage = 'مرحباً بعودتك! حصلت على $credited دينار عن $capped ساعة غياب';
     lastActiveAt = DateTime.now();
     _record('مكافأة العودة', lastOfflineRewardMessage!, moneyDelta: credited);
     _commit();
