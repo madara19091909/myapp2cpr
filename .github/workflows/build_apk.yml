@@ -122,9 +122,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode \
-            > android/app/release-keystore.jks
+          # حفظ المفتاح بالمسار المباشر والمضبوط داخل مجلد app
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
 
+          # إنشاء ملف key.properties
           cat > android/key.properties <<EOF
           storePassword=$RELEASE_STORE_PASSWORD
           keyPassword=$RELEASE_KEY_PASSWORD
@@ -171,7 +172,7 @@ jobs:
                   create("release") {
                       keyAlias = keystoreProperties["keyAlias"] as String?
                       keyPassword = keystoreProperties["keyPassword"] as String?
-                      storeFile = keystoreProperties["storeFile"]?.let { file("$it") }
+                      storeFile = keystoreProperties["storeFile"]?.let { file(it) }
                       storePassword = keystoreProperties["storePassword"] as String?
                   }
               }
