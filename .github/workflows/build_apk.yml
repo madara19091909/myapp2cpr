@@ -40,7 +40,10 @@ jobs:
           cache: true
 
       - name: Generate Android platform files if missing
+        shell: bash
         run: |
+          set -euo pipefail
+
           if [ ! -d android ]; then
             flutter create \
               --platforms=android \
@@ -48,10 +51,6 @@ jobs:
               --project-name farm_party \
               .
           fi
-
-      - name: Remove unwanted test directory
-        run: |
-          rm -rf test
 
       - name: Patch Android configuration
         shell: bash
@@ -148,12 +147,13 @@ jobs:
           source = gradle.read_text()
 
           if gradle.suffix == ".kts":
-              imports = (
-                  "import java.util.Properties\n"
-                  "import java.io.FileInputStream\n"
-              )
+              if "signingConfigs {" not in source:
+                  imports = (
+                      "import java.util.Properties\n"
+                      "import java.io.FileInputStream\n"
+                  )
 
-              props = """
+                  props = """
           val keystoreProperties = Properties()
           val keystorePropertiesFile = rootProject.file("key.properties")
           if (keystorePropertiesFile.exists()) {
@@ -161,7 +161,6 @@ jobs:
           }
           """
 
-              if "signingConfigs {" not in source:
                   source = imports + source
                   source = source.replace(
                       "android {",
@@ -171,7 +170,7 @@ jobs:
                   create("release") {
                       keyAlias = keystoreProperties["keyAlias"] as String?
                       keyPassword = keystoreProperties["keyPassword"] as String?
-                      storeFile = keystoreProperties["storeFile"]?.let { file("$it") }
+                      storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
                       storePassword = keystoreProperties["storePassword"] as String?
                   }
               }
@@ -185,7 +184,8 @@ jobs:
               )
 
           else:
-              block = """
+              if "signingConfigs {" not in source:
+                  block = """
           def keystoreProperties = new Properties()
           def keystorePropertiesFile = rootProject.file('key.properties')
           if (keystorePropertiesFile.exists()) {
@@ -193,7 +193,6 @@ jobs:
           }
           """
 
-              if "signingConfigs {" not in source:
                   source = source.replace(
                       "android {",
                       block + """
@@ -222,24 +221,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Confirm tests are absent
-        run: |
-          if [ -d test ]; then
-            echo "Unexpected test directory found."
-            exit 1
-          fi
+      - name: Generate Android app icons
+        run: dart run flutter_launcher_icons
 
       - name: Analyze Dart and Flutter sources
         run: flutter analyze
 
-      - name: Run automated tests if present
-        shell: bash
-        run: |
-          if [ -d test ] && find test -type f -name '*_test.dart' | grep -q .; then
-            flutter test --reporter expanded
-          else
-            echo "No automated test files found; skipping flutter test."
-          fi
+      - name: Run automated tests
+        run: flutter test --reporter expanded
 
       - name: Build release APK
         shell: bash
