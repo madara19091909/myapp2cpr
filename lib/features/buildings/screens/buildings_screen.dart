@@ -65,7 +65,7 @@ class BuildingsScreen extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Text(
-                      '${c['emoji'] ?? ''} ${c['name'] ?? ''} ×${c['qty'] ?? 1} — ${left > 0 ? 'باقي ${left}ث' : 'جاهز عند التحديث'}',
+                      '${c['emoji'] ?? ''} ${c['name'] ?? ''} ×${c['qty'] ?? 1} — ${left > 0 ? 'باقي $left ث' : 'جاهز عند التحديث'}',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   );
