@@ -38,8 +38,8 @@ class ProgressionScreen extends StatelessWidget {
           ]),
           const SizedBox(height: 12),
           if (game.legacyUnverified) ...[
-            CartoonCard(
-              color: const Color(0xFFFFF3CD),
+            const CartoonCard(
+              color: Color(0xFFFFF3CD),
               child: const Text(
                 'حسابك من إصدار سابق. تم الحفاظ على تقدمك، لكن مكافآت المهام والإنجازات متوقفة مؤقتاً إلى أن تتم مراجعة رصيد الحساب من الإدارة.',
                 style: TextStyle(color: Color(0xFF765400), fontWeight: FontWeight.w800),
