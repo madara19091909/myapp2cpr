@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/cartoon_button.dart';
 import '../../../core/widgets/cartoon_card.dart';
-import '../../../core/widgets/toast.dart';
 import '../../game/state/game_state.dart';
 import '../../shop/data/shop_data.dart';
 
@@ -46,12 +44,10 @@ class _MarketScreenState extends State<MarketScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.dark)),
           const SizedBox(height: 5),
-          Text('تابع أرباحك واستلم مكافآتك اليومية',
+          Text('تابع أسعار السوق وسجل معاملات مزرعتك',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.dark.withValues(alpha: .72), fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
-          _DailyRewardCard(game: game),
-          const SizedBox(height: 14),
           _DailyMarketBoard(game: game),
           const SizedBox(height: 18),
           Row(children: [
@@ -123,52 +119,6 @@ class _DailyMarketBoard extends StatelessWidget {
             Text('${formatIqd(game.marketSalePrice(crop))} / قطعة',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.green)),
           ])),
-      ]),
-    );
-  }
-}
-
-class _DailyRewardCard extends StatelessWidget {
-  const _DailyRewardCard({required this.game});
-  final GameState game;
-
-  @override
-  Widget build(BuildContext context) {
-    final nextDay = game.canClaimDailyReward
-        ? (game.dailyStreak % 7) + 1
-        : (game.dailyStreak == 0 ? 1 : game.dailyStreak);
-    final cash = 300 + (nextDay - 1) * 50;
-    final gold = nextDay == 7 ? 1 : 0;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF237D3A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1B5E20), width: 3),
-        boxShadow: const [BoxShadow(color: Color(0x332E5D25), blurRadius: 10, offset: Offset(0, 5))],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [Text('🎁', style: TextStyle(fontSize: 34)), SizedBox(width: 10), Expanded(child: Text('هدية الدخول اليومي', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900))) ]),
-        const SizedBox(height: 8),
-        Text('${game.canClaimDailyReward ? 'مكافأة اليوم $nextDay' : 'تم استلام مكافأة اليوم'} من 7  •  +${formatIqd(cash)}  •  +$gold 🪙', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 12),
-        Row(children: List.generate(7, (i) => Expanded(child: Container(
-          margin: const EdgeInsetsDirectional.only(end: 4),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(color: i < game.dailyStreak ? AppColors.gold : Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: .65))),
-          child: Text('${i + 1}', textAlign: TextAlign.center, style: TextStyle(color: i < game.dailyStreak ? AppColors.dark : Colors.white, fontWeight: FontWeight.w900)),
-        )))),
-        const SizedBox(height: 14),
-        SizedBox(width: double.infinity, child: CartoonButton(
-          color: game.canClaimDailyReward ? AppColors.orange : const Color(0xFFBDBDBD),
-          leading: game.canClaimDailyReward ? '🎉' : '✅',
-          label: game.canClaimDailyReward ? 'استلم مكافأتك' : 'تم استلام مكافأة اليوم',
-          onPressed: game.canClaimDailyReward ? () async {
-            final error = await context.read<GameState>().claimDailyReward();
-            if (!context.mounted) return;
-            showToast(context, error ?? 'مبروك! تمت إضافة المكافأة إلى رصيدك', color: error == null ? AppColors.green : AppColors.red);
-          } : null,
-        )),
       ]),
     );
   }
