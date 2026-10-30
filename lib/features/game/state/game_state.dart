@@ -173,12 +173,6 @@ class GameState extends ChangeNotifier {
       !isDailyMissionClaimed(mission['id'] as String) &&
       dailyMissionProgress(mission) >= (mission['target'] as int);
 
-  static Map<String, dynamic>? _findDefinition(List<Map<String, dynamic>> list, String id) {
-    for (final item in list) {
-      if (item['id'] == id) return item;
-    }
-    return null;
-  }
 
   Future<String?> claimDailyMission(String id) => _runSecureErrorAction('claimDailyMission', {'id': id});
 
@@ -800,22 +794,6 @@ class GameState extends ChangeNotifier {
   /// يسمح للاختبارات أو لإغلاق التطبيق بانتظار اكتمال آخر حفظ محلي.
   Future<void> waitForLocalSave() => _saveQueue;
 
-  Future<void> _save() {
-    if (_persistBlocked) return _saveQueue;
-    // نسلسل الكتابات: عمليتان سريعتان ما يجوز أن تنتهي الأقدم أخيراً.
-    final key = _localKey;
-    final snapshot = jsonEncode(_toMap());
-    _saveQueue = _saveQueue.catchError((_) {}).then((_) async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(key, snapshot);
-      } catch (_) {
-        // هذا الملف نسخة استرجاع فقط؛ لا نمنع مزامنة Firebase إذا فشل التخزين المحلي.
-      }
-      // Cloud state is server-authoritative and is written only by callable Functions.
-    });
-    return _saveQueue;
-  }
 
   Future<Map<String, dynamic>> _callSecureAction(String action, [Map<String, dynamic> args = const {}]) async {
     if (uid == null) throw StateError('يجب تسجيل الدخول لتنفيذ العملية.');
