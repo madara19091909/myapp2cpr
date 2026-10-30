@@ -519,7 +519,7 @@ class GameState extends ChangeNotifier {
   String? cloudSyncError;
   bool isCloudSaving = false;
   DateTime? lastCloudSync;
-  Future<void> _saveQueue = Future<void>.value();
+  final Future<void> _saveQueue = Future<void>.value();
 
   /// يمنع أي حفظ (محلي أو سحابي) إذا فشل جلب بيانات اللاعب،
   /// حتى لا تُكتب القيم الافتراضية فوق التقدم الحقيقي.
