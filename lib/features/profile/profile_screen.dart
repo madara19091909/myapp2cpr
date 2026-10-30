@@ -130,7 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onEditName: () => _editName(context, game.playerName),
                     onLogout: () => _logout(context),
                   ),
-                _ProfileSection.rewards => _RewardsPage(key: const ValueKey('profile-rewards')),
+                _ProfileSection.rewards => const _RewardsPage(key: ValueKey('profile-rewards')),
                 _ProfileSection.friends => SocialScreen(
                     key: const ValueKey('profile-friends'),
                     firebaseReady: widget.firebaseReady,
