@@ -64,43 +64,6 @@ class ProgressionScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          CartoonCard(
-            color: const Color(0xFFFFF8E1),
-            child: Row(
-              children: [
-                const Text('🎁', style: TextStyle(fontSize: 36)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('صندوق الحظ اليومي', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                      Text(
-                        game.canClaimLucky ? 'متاح الآن — افتحه!' : 'استلمته اليوم • سلسلة ${game.luckyStreak}',
-                        style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: game.canClaimLucky ? AppColors.orange : Colors.grey),
-                  onPressed: !game.canClaimLucky
-                      ? null
-                      : () async {
-                          final msg = await context.read<GameState>().claimLuckyChest();
-                          if (!context.mounted) return;
-                          showToast(
-                            context,
-                            msg ?? 'تم',
-                            color: (msg != null && !msg.contains('بالفعل')) ? AppColors.green : AppColors.red,
-                          );
-                        },
-                  child: const Text('فتح', style: TextStyle(fontWeight: FontWeight.w900)),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 18),
           const _SectionTitle(title: '📅 مهام اليوم', subtitle: 'تتجدد المهام عند بداية يوم جديد'),
           for (final mission in GameState.dailyMissionDefinitions)
