@@ -71,6 +71,7 @@ class FarmScreen extends StatelessWidget {
       );
     } else if (plot.isReady(now)) {
       final result = await g.harvest(i);
+      if (!context.mounted) return;
       if (result != null) {
         _toastHarvest(
           context,
@@ -94,7 +95,7 @@ class FarmScreen extends StatelessWidget {
   Future<void> _harvestAll(BuildContext context) async {
     final g = context.read<GameState>();
     final result = await g.harvestAllReady();
-    if (result == null) return;
+    if (!context.mounted || result == null) return;
     _toastHarvest(
       context,
       count: result.harvestedCount,
