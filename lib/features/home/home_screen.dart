@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../buildings/screens/buildings_screen.dart';
 import '../farm/screens/farm_screen.dart';
 import '../market/screens/market_screen.dart';
 import '../inventory/screens/inventory_screen.dart';
-import '../shop/screens/animals_screen.dart';
-import '../shop/screens/seeds_screen.dart';
-import '../shop/screens/tools_screen.dart';
-import '../social/social_screen.dart';
-import '../progression/screens/progression_screen.dart';
+import '../shop/screens/shop_hub_screen.dart';
+import '../profile/profile_screen.dart';
 import '../game/state/game_state.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/top_bar.dart';
@@ -25,6 +21,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _index = 0;
+  int _profileRevision = 0;
+
+  void _openProfile() {
+    setState(() {
+      _index = 4;
+      _profileRevision++;
+    });
+  }
 
   @override
   void initState() {
@@ -54,14 +58,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       const FarmScreen(),
-      const SeedsScreen(),
-      const AnimalsScreen(),
-      const ToolsScreen(),
-      const BuildingsScreen(),
-      const InventoryScreen(),
+      const ShopHubScreen(),
       const MarketScreen(),
-      SocialScreen(firebaseReady: widget.firebaseReady),
-      const ProgressionScreen(),
+      const InventoryScreen(),
+      ProfileScreen(key: ValueKey<int>(_profileRevision), firebaseReady: widget.firebaseReady),
     ];
     return Scaffold(
       body: DecoratedBox(
@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         child: Column(
           children: [
-            const TopBar(),
+            TopBar(onProfileTap: _openProfile),
             if (context.watch<GameState>().legacyUnverified)
               Container(
                 width: double.infinity,
@@ -93,19 +93,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0, .025), end: Offset.zero).animate(animation),
-                    child: child,
-                  ),
-                ),
-                child: KeyedSubtree(key: ValueKey<int>(_index), child: pages[_index]),
-              ),
+              child: IndexedStack(index: _index, children: pages),
             ),
           ],
         ),
