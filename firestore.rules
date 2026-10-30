@@ -1,0 +1,309 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Every client-facing database operation requires a verified Firebase email.
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Only an out-of-band custom claim can grant administrator-management rights.
+    // Ordinary admins must never be able to promote another account.
+    function isSuperAdmin() {
+      return signedIn() && request.auth.token.superadmin == true;
+    }
+
+    function validSavedPlot(plot) {
+      return plot is map
+        && plot.keys().hasOnly(['crop', 'at', 'sec', 'watered'])
+        && (plot.crop == null || (plot.crop is string && plot.crop.size() <= 60))
+        && (plot.at == null || (plot.at is string && plot.at.size() <= 40))
+        && plot.sec is int && plot.sec >= 0 && plot.sec <= 100000000
+        && plot.watered is bool;
+    }
+
+    function validFarmPlot(plot) {
+      return plot is map
+        && plot.keys().hasOnly(['cropId', 'plantedAt', 'growSeconds', 'watered'])
+        && (plot.cropId == null || (plot.cropId is string && plot.cropId.size() <= 60))
+        && (plot.plantedAt == null || (plot.plantedAt is string && plot.plantedAt.size() <= 40))
+        && plot.growSeconds is int && plot.growSeconds >= 0 && plot.growSeconds <= 100000000
+        && plot.watered is bool;
+    }
+
+    function validSavePlots(data) {
+      return data.plots.size() >= 9 && data.plots.size() <= 24
+        && validSavedPlot(data.plots[0])
+        && validSavedPlot(data.plots[1])
+        && validSavedPlot(data.plots[2])
+        && validSavedPlot(data.plots[3])
+        && validSavedPlot(data.plots[4])
+        && validSavedPlot(data.plots[5])
+        && validSavedPlot(data.plots[6])
+        && validSavedPlot(data.plots[7])
+        && validSavedPlot(data.plots[8])
+        && (data.plots.size() <= 9 || validSavedPlot(data.plots[9]))
+        && (data.plots.size() <= 10 || validSavedPlot(data.plots[10]))
+        && (data.plots.size() <= 11 || validSavedPlot(data.plots[11]))
+        && (data.plots.size() <= 12 || validSavedPlot(data.plots[12]))
+        && (data.plots.size() <= 13 || validSavedPlot(data.plots[13]))
+        && (data.plots.size() <= 14 || validSavedPlot(data.plots[14]))
+        && (data.plots.size() <= 15 || validSavedPlot(data.plots[15]))
+        && (data.plots.size() <= 16 || validSavedPlot(data.plots[16]))
+        && (data.plots.size() <= 17 || validSavedPlot(data.plots[17]))
+        && (data.plots.size() <= 18 || validSavedPlot(data.plots[18]))
+        && (data.plots.size() <= 19 || validSavedPlot(data.plots[19]))
+        && (data.plots.size() <= 20 || validSavedPlot(data.plots[20]))
+        && (data.plots.size() <= 21 || validSavedPlot(data.plots[21]))
+        && (data.plots.size() <= 22 || validSavedPlot(data.plots[22]))
+        && (data.plots.size() <= 23 || validSavedPlot(data.plots[23]));
+    }
+
+    function validFarmPlots(data) {
+      return data.plots.size() >= 9 && data.plots.size() <= 24
+        && validFarmPlot(data.plots[0])
+        && validFarmPlot(data.plots[1])
+        && validFarmPlot(data.plots[2])
+        && validFarmPlot(data.plots[3])
+        && validFarmPlot(data.plots[4])
+        && validFarmPlot(data.plots[5])
+        && validFarmPlot(data.plots[6])
+        && validFarmPlot(data.plots[7])
+        && validFarmPlot(data.plots[8])
+        && (data.plots.size() <= 9 || validFarmPlot(data.plots[9]))
+        && (data.plots.size() <= 10 || validFarmPlot(data.plots[10]))
+        && (data.plots.size() <= 11 || validFarmPlot(data.plots[11]))
+        && (data.plots.size() <= 12 || validFarmPlot(data.plots[12]))
+        && (data.plots.size() <= 13 || validFarmPlot(data.plots[13]))
+        && (data.plots.size() <= 14 || validFarmPlot(data.plots[14]))
+        && (data.plots.size() <= 15 || validFarmPlot(data.plots[15]))
+        && (data.plots.size() <= 16 || validFarmPlot(data.plots[16]))
+        && (data.plots.size() <= 17 || validFarmPlot(data.plots[17]))
+        && (data.plots.size() <= 18 || validFarmPlot(data.plots[18]))
+        && (data.plots.size() <= 19 || validFarmPlot(data.plots[19]))
+        && (data.plots.size() <= 20 || validFarmPlot(data.plots[20]))
+        && (data.plots.size() <= 21 || validFarmPlot(data.plots[21]))
+        && (data.plots.size() <= 22 || validFarmPlot(data.plots[22]))
+        && (data.plots.size() <= 23 || validFarmPlot(data.plots[23]));
+    }
+
+
+    function validSave(data) {
+      return data.keys().hasOnly([
+        'name', 'money', 'gold', 'xp', 'level', 'seeds', 'harvestedCrops',
+        'animals', 'animalFeed', 'waterUnits', 'boostedCycles', 'tools',
+        'buildings', 'decor', 'products', 'activeCrafts',
+        'transactions', 'lastDailyRewardDate', 'dailyStreak',
+        'lastLuckyDate', 'luckyStreak', 'insuranceUntil',
+        'dailyProgressDate', 'dailyProgress', 'claimedDailyMissions',
+        'lifetimeStats', 'claimedAchievements', 'lastActiveAt',
+        'collect', 'plots', 'updated'
+      ])
+      && data.name is string && data.name.size() > 0 && data.name.size() <= 24
+      && data.money is int && data.money >= 0 && data.money <= 2000000000
+      && data.gold is int && data.gold >= 0 && data.gold <= 1000000
+      && data.xp is int && data.xp >= 0 && data.xp <= 1000000000
+      && data.level is int && data.level >= 1 && data.level <= 1000000
+      && data.seeds is map && data.seeds.size() <= 100
+      && data.harvestedCrops is map && data.harvestedCrops.size() <= 100
+      && data.animals is map && data.animals.size() <= 100
+      && data.products is map && data.products.size() <= 100
+      && data.boostedCycles is map && data.boostedCycles.size() <= 100
+      && data.tools is list && data.tools.size() <= 100
+      && data.buildings is list && data.buildings.size() <= 100
+      && data.decor is list && data.decor.size() <= 100
+      && data.activeCrafts is list && data.activeCrafts.size() <= 100
+      && data.transactions is list && data.transactions.size() <= 60
+      && data.animalFeed is int && data.animalFeed >= 0 && data.animalFeed <= 1000000
+      && data.waterUnits is int && data.waterUnits >= 0 && data.waterUnits <= 1000000
+      && data.dailyStreak is int && data.dailyStreak >= 0 && data.dailyStreak <= 7
+      && data.luckyStreak is int && data.luckyStreak >= 0 && data.luckyStreak <= 1000000
+      && data.dailyProgress is map && data.dailyProgress.size() <= 100
+      && data.lifetimeStats is map && data.lifetimeStats.size() <= 100
+      && data.claimedDailyMissions is list && data.claimedDailyMissions.size() <= 100
+      && data.claimedAchievements is list && data.claimedAchievements.size() <= 100
+      && data.collect is map && data.collect.size() <= 100
+      && data.plots is list && validSavePlots(data)
+      && data.updated is int;
+    }
+
+    function validFriendRecord(data, friendUid) {
+      return data.keys().hasOnly(['uid', 'addedAt'])
+        && data.uid == friendUid
+        && data.addedAt == request.time;
+    }
+
+    function isExistingFriend(uid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid)/friends/$(request.auth.uid));
+    }
+
+    function hasValidIncomingFriendRequest(receiverUid, senderUid) {
+      let requestPath = /databases/$(database)/documents/users/$(receiverUid)/friendRequests/$(senderUid);
+      return exists(requestPath)
+        && get(requestPath).data.keys().hasOnly(['fromUid', 'fromName', 'toUid', 'createdAt', 'status'])
+        && get(requestPath).data.fromUid == senderUid
+        && get(requestPath).data.toUid == receiverUid
+        && get(requestPath).data.status == 'pending'
+        && get(requestPath).data.createdAt is timestamp
+        && get(requestPath).data.fromName is string;
+    }
+
+    function validPublicProfile(data, uid) {
+      // Public identity only; do not publish client-controlled money or level.
+      return data.keys().hasOnly(['uid', 'name', 'updated'])
+        && data.uid == uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 40
+        && data.updated is int;
+    }
+
+    function validFarmSnapshot(data, uid) {
+      return data.keys().hasOnly(['uid', 'name', 'plots', 'updated'])
+        && data.uid == uid
+        && data.name is string && data.name.size() <= 24
+        && data.plots is list && validFarmPlots(data)
+        && data.updated is int;
+    }
+
+    // Admin documents are self-readable. Only a separately granted custom claim
+    // can create, edit, or remove admin membership records.
+    match /admins/{uid} {
+      allow read: if owns(uid) || isAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if owns(uid) || isAdmin();
+      // Legacy client-writable save is frozen. Canonical game state is stored
+      // under /gameStates and can only be changed by Admin SDK Cloud Functions.
+      allow create, update, delete: if false;
+
+      match /friends/{friendUid} {
+        allow read: if owns(uid) || isAdmin()
+          || (signedIn()
+            && request.auth.uid == friendUid
+            && exists(/databases/$(database)/documents/users/$(friendUid)/friendRequests/$(uid)));
+
+        // Both sides of the friendship can be created only while the accepter's
+        // incoming request exists. This blocks direct/one-sided friend forging.
+        allow create: if isAdmin() || (signedIn()
+          && uid != friendUid
+          && validFriendRecord(request.resource.data, friendUid)
+          && (
+            (owns(uid)
+              && hasValidIncomingFriendRequest(uid, friendUid))
+            || (request.auth.uid == friendUid
+              && hasValidIncomingFriendRequest(friendUid, uid))
+          )
+          // Both reciprocal records must be committed atomically in the same batch.
+          && existsAfter(/databases/$(database)/documents/users/$(friendUid)/friends/$(uid))
+          && getAfter(/databases/$(database)/documents/users/$(friendUid)/friends/$(uid)).data.uid == uid
+          && getAfter(/databases/$(database)/documents/users/$(friendUid)/friends/$(uid)).data.addedAt == request.time);
+
+        // Keep both friendship records consistent: either side may unfriend,
+        // but both reciprocal documents must be removed in the same batch.
+        allow delete: if isAdmin() || (signedIn()
+          && (owns(uid) || request.auth.uid == friendUid)
+          && !existsAfter(/databases/$(database)/documents/users/$(friendUid)/friends/$(uid)));
+        allow update: if false;
+      }
+
+      match /friendRequests/{fromUid} {
+        allow read: if owns(uid) || isAdmin() || (signedIn() && request.auth.uid == fromUid);
+        allow create: if isAdmin() || (signedIn()
+          && fromUid == request.auth.uid
+          && uid != request.auth.uid
+          && exists(/databases/$(database)/documents/publicProfiles/$(uid))
+          && !exists(/databases/$(database)/documents/users/$(uid)/friends/$(fromUid))
+          && request.resource.data.keys().hasOnly(['fromUid', 'fromName', 'toUid', 'createdAt', 'status'])
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.toUid == uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.fromName is string
+          && request.resource.data.fromName.size() <= 24
+          && get(/databases/$(database)/documents/publicProfiles/$(fromUid)).data.name == request.resource.data.fromName
+          && getAfter(/databases/$(database)/documents/users/$(fromUid)/sentRequests/$(uid)).data.fromUid == fromUid
+          && getAfter(/databases/$(database)/documents/users/$(fromUid)/sentRequests/$(uid)).data.toUid == uid
+          && getAfter(/databases/$(database)/documents/users/$(fromUid)/sentRequests/$(uid)).data.status == 'pending');
+        // A request and its sender-side mirror are removed atomically.
+        allow delete: if isAdmin() || (signedIn()
+          && (owns(uid) || request.auth.uid == fromUid)
+          && !existsAfter(/databases/$(database)/documents/users/$(fromUid)/sentRequests/$(uid)));
+        allow update: if false;
+      }
+
+      match /sentRequests/{toUid} {
+        allow read: if owns(uid) || isAdmin();
+        allow create: if isAdmin() || (owns(uid)
+          && toUid != uid
+          && exists(/databases/$(database)/documents/publicProfiles/$(toUid))
+          && !exists(/databases/$(database)/documents/users/$(uid)/friends/$(toUid))
+          && request.resource.data.keys().hasOnly(['fromUid', 'fromName', 'toUid', 'toName', 'createdAt', 'status'])
+          && request.resource.data.fromUid == uid
+          && request.resource.data.toUid == toUid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.fromName is string
+          && request.resource.data.fromName.size() <= 24
+          && request.resource.data.toName is string
+          && request.resource.data.toName.size() <= 24
+          && get(/databases/$(database)/documents/publicProfiles/$(toUid)).data.name == request.resource.data.toName
+          && getAfter(/databases/$(database)/documents/users/$(toUid)/friendRequests/$(uid)).data.fromUid == uid
+          && getAfter(/databases/$(database)/documents/users/$(toUid)/friendRequests/$(uid)).data.toUid == toUid
+          && getAfter(/databases/$(database)/documents/users/$(toUid)/friendRequests/$(uid)).data.status == 'pending');
+        allow delete: if isAdmin() || (signedIn()
+          && (owns(uid) || request.auth.uid == toUid)
+          && !existsAfter(/databases/$(database)/documents/users/$(toUid)/friendRequests/$(uid)));
+        allow update: if false;
+      }
+    }
+
+    // Trusted game state: players may read only their own state; all writes
+    // go through callable Cloud Functions using the Admin SDK.
+    match /gameStates/{uid} {
+      allow read: if owns(uid) || isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // Idempotency receipts are private to the owner and immutable from clients.
+    match /gameActionReceipts/{uid}/items/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /gameActionLimits/{uid} {
+      allow read, write: if false;
+    }
+
+    match /bootstrapLimits/{uid} {
+      allow read, write: if false;
+    }
+
+    // Leaderboard/search information only. Farm contents are stored separately.
+    match /publicProfiles/{uid} {
+      allow read: if signedIn();
+      // Profiles are derived from trusted server-side game state.
+      allow create, update, delete: if false;
+    }
+
+    // Farm layouts are visible only to the owner, administrators, and accepted friends.
+    match /farmSnapshots/{uid} {
+      allow read: if owns(uid) || isAdmin() || isExistingFriend(uid);
+      // Farm snapshots are generated by Admin SDK after validated actions.
+      allow create, update, delete: if false;
+    }
+
+    // Immutable evidence of privileged admin changes. Only trusted server code writes.
+    match /adminAuditLogs/{logId} {
+      allow read, write: if false;
+    }
+  }
+}

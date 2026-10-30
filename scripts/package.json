@@ -1,0 +1,17 @@
+{
+  "name": "farm-party-security-maintenance",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Trusted one-off Firebase admin maintenance scripts",
+  "main": "grant_superadmin_claim.js",
+  "scripts": {
+    "grant-superadmin": "node grant_superadmin_claim.js",
+    "migrate-public-profiles": "node migrate_public_profiles.js"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0"
+  },
+  "engines": {
+    "node": "22"
+  }
+}

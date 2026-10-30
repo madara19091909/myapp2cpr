@@ -1,0 +1,172 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test Cloud Functions
+        run: |
+          npm --prefix functions install --no-audit --no-fund
+          npm --prefix functions run lint
+          npm --prefix functions test
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform files if missing
+        run: |
+          if [ ! -d android ]; then
+            flutter create \
+              --platforms=android \
+              --org com.farmparty \
+              --project-name farm_party \
+              .
+          fi
+
+      - name: Patch Android configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "AndroidManifest.xml was not found."
+            exit 1
+          fi
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i \
+              's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' \
+              "$MANIFEST"
+          fi
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import re
+          candidates = [Path("android/app/build.gradle"), Path("android/app/build.gradle.kts")]
+          gradle = next((p for p in candidates if p.exists()), None)
+          if gradle is None:
+              raise SystemExit("Android app Gradle file was not found.")
+          source = gradle.read_text()
+          if gradle.suffix == ".kts":
+              source, count = re.subn(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 23", source)
+              if count == 0:
+                  source, count = re.subn(r"minSdk\s*=\s*\d+", "minSdk = 23", source)
+          else:
+              source, count = re.subn(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 23", source)
+              if count == 0:
+                  source, count = re.subn(r"minSdkVersion\s+\d+", "minSdkVersion 23", source)
+          if count == 0:
+              raise SystemExit("Could not locate minSdk configuration.")
+          gradle.write_text(source)
+          print(f"Android Gradle configuration updated: {gradle}")
+          PYCODE
+
+      - name: Configure release signing when secrets are provided
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "Release keystore not configured; Flutter will use the configured build signing." 
+            exit 0
+          fi
+          : "${RELEASE_KEY_ALIAS:?Missing RELEASE_KEY_ALIAS}"
+          : "${RELEASE_KEY_PASSWORD:?Missing RELEASE_KEY_PASSWORD}"
+          : "${RELEASE_STORE_PASSWORD:?Missing RELEASE_STORE_PASSWORD}"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+          cat > android/key.properties <<EOF2
+          storePassword=$RELEASE_STORE_PASSWORD
+          keyPassword=$RELEASE_KEY_PASSWORD
+          keyAlias=$RELEASE_KEY_ALIAS
+          storeFile=release-keystore.jks
+          EOF2
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          candidates = [Path("android/app/build.gradle"), Path("android/app/build.gradle.kts")]
+          gradle = next((p for p in candidates if p.exists()), None)
+          if gradle is None:
+              raise SystemExit("Android app Gradle file was not found.")
+          source = gradle.read_text()
+          if gradle.suffix == ".kts":
+              imports = "import java.util.Properties\nimport java.io.FileInputStream\n"
+              props = '''\nval keystoreProperties = Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(FileInputStream(keystorePropertiesFile))\n}\n'''
+              if "signingConfigs {" not in source:
+                  source = imports + source
+                  source = source.replace("android {", props + '''\nandroid {\n    signingConfigs {\n        create("release") {\n            keyAlias = keystoreProperties["keyAlias"] as String?\n            keyPassword = keystoreProperties["keyPassword"] as String?\n            storeFile = keystoreProperties["storeFile"]?.let { file(it) }\n            storePassword = keystoreProperties["storePassword"] as String?\n        }\n    }\n''', 1)
+              source = source.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
+          else:
+              props = '''\ndef keystoreProperties = new Properties()\ndef keystorePropertiesFile = rootProject.file('key.properties')\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n}\n'''
+              if "signingConfigs {" not in source:
+                  source = source.replace("android {", props + '''\nandroid {\n    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null\n            storePassword keystoreProperties['storePassword']\n        }\n    }\n''', 1)
+              source = source.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+          gradle.write_text(source)
+          print("Release signing configuration updated.")
+          PYCODE
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart and Flutter sources
+        run: flutter analyze
+
+      - name: Run automated tests when present
+        shell: bash
+        run: |
+          if [ -d test ] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            flutter test --reporter expanded
+          else
+            echo "No Dart test files found; skipping flutter test."
+          fi
+
+      - name: Build release APK
+        shell: bash
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          for V in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_MESSAGING_SENDER_ID FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET; do
+            if [ -n "${!V:-}" ]; then
+              ARGS+=("--dart-define=$V=${!V}")
+            fi
+          done
+          flutter build apk --release "${ARGS[@]}"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: farm-party-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
