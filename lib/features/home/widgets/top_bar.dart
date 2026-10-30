@@ -4,10 +4,11 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../game/state/game_state.dart';
-import '../../profile/profile_sheet.dart';
 
 class TopBar extends StatelessWidget {
-  const TopBar({super.key});
+  const TopBar({super.key, required this.onProfileTap});
+
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +29,7 @@ class TopBar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
           child: Row(
             children: [
-              _Avatar(level: game.level, onTap: () => showProfileSheet(context)),
+              _Avatar(level: game.level, onTap: onProfileTap),
               const SizedBox(width: 7),
               Expanded(
                 child: Column(
