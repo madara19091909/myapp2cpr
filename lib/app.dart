@@ -1,6 +1,4 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/firebase/firebase_options.dart';
@@ -45,21 +43,7 @@ class _FarmAppState extends State<FarmApp> {
         Firebase.app();
       }
 
-      // App Check is an additional protection layer. Do not prevent the entire
-      // game from opening if its native provider fails to initialize on a device.
-      // If Firebase Console enforces App Check, protected requests may still be
-      // rejected until the provider / Play Integrity configuration is corrected.
-      try {
-        await FirebaseAppCheck.instance.activate(
-          androidProvider: kDebugMode
-              ? AndroidProvider.debug
-              : AndroidProvider.playIntegrity,
-        );
-      } catch (appCheckError, stackTrace) {
-        debugPrint('Firebase App Check activation failed: $appCheckError');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-
+      // Authentication and Firestore are used for accounts and save sync only.
       if (!mounted) return;
       setState(() {
         _firebaseReady = true;
