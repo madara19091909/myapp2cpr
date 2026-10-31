@@ -45,11 +45,21 @@ class _FarmAppState extends State<FarmApp> {
         Firebase.app();
       }
 
-      // App Check adds an additional signal that requests come from this app.
-      // Register the debug token in Firebase Console when running debug builds.
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-      );
+      // App Check is an additional protection layer. Do not prevent the entire
+      // game from opening if its native provider fails to initialize on a device.
+      // If Firebase Console enforces App Check, protected requests may still be
+      // rejected until the provider / Play Integrity configuration is corrected.
+      try {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: kDebugMode
+              ? AndroidProvider.debug
+              : AndroidProvider.playIntegrity,
+        );
+      } catch (appCheckError, stackTrace) {
+        debugPrint('Firebase App Check activation failed: $appCheckError');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+
       if (!mounted) return;
       setState(() {
         _firebaseReady = true;
