@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFFBF2), Color(0xFFFFEFC8), Color(0xFFFFE4A8)],
+            colors: [Color(0xFFF7F8F5), Color(0xFFF0F4ED), Color(0xFFE7EEE3)],
             stops: [0.0, 0.55, 1.0],
           ),
         ),
@@ -83,8 +83,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFE8C2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFB7791F)),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE5C58A)),
                 ),
                 child: const Text(
                   'حسابك القديم قيد المراجعة الأمنية. تم حفظ تقدمك، لكن عمليات المزرعة والشراء والبيع والمكافآت متوقفة مؤقتاً حتى يراجع الأدمن الأرصدة القديمة ويعتمد الحساب.',
