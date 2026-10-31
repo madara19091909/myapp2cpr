@@ -40,7 +40,7 @@ class PlotTile extends StatelessWidget {
             : '${crop.name} ينمو، الوقت المتبقي ${formatDuration(remaining)}';
 
     final symbol = crop == null
-        ? '➕'
+        ? ''
         : ready
             ? crop.emoji
             : progress < .34
@@ -65,51 +65,75 @@ class PlotTile extends StatelessWidget {
                 return Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                       colors: ready
-                          ? const [Color(0xFFE8B85D), Color(0xFFB7792D)]
-                          : const [Color(0xFFC99155), AppColors.soil],
+                          ? const [Color(0xFFF7D98E), Color(0xFFD7A34F)]
+                          : crop == null
+                              ? const [Color(0xFFB98D65), Color(0xFF936A4B)]
+                              : const [Color(0xFFB58A5D), Color(0xFF805A3C)],
                     ),
                     borderRadius: BorderRadius.circular(_radius),
                     border: Border.all(
-                      color: ready ? AppColors.gold : AppColors.soilDark,
-                      width: ready ? 3 : 2,
+                      color: ready ? const Color(0xFFE8B84E) : const Color(0xFFE6C6A3),
+                      width: ready ? 2.2 : 1.4,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        // Flutter < 3.27: withOpacity(.4 + .35 * t)
                         color: ready
-                            ? AppColors.gold.withValues(alpha: .4 + .35 * t)
-                            : const Color(0x33000000),
-                        offset: const Offset(0, 4),
-                        blurRadius: ready ? 6 + 6 * t : 3,
+                            ? AppColors.gold.withValues(alpha: .30 + .25 * t)
+                            : const Color(0x252B3F2D),
+                        offset: const Offset(0, 5),
+                        blurRadius: ready ? 10 + 4 * t : 9,
                       ),
                     ],
                   ),
                   child: Stack(
                     children: [
-                      // الرمز بالنص
+                      // Empty plots use a clear, soft planting action instead of a huge plus glyph.
                       Center(
-                        child: AnimatedScale(
-                          scale: ready ? 1.06 + .04 * t : 1,
-                          duration: const Duration(milliseconds: 200),
-                          child: Opacity(
-                            opacity: crop == null ? .65 : 1,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              transitionBuilder: (child, anim) => ScaleTransition(
-                                scale: anim,
-                                child: FadeTransition(opacity: anim, child: child),
+                        child: crop == null
+                            ? Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: size * .42,
+                                    height: size * .42,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: .18),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withValues(alpha: .38), width: 1.3),
+                                    ),
+                                    child: Icon(Icons.add_rounded, color: Colors.white, size: size * .27),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'ازرع هنا',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      shadows: [Shadow(color: Color(0x55000000), blurRadius: 5, offset: Offset(0, 1))],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : AnimatedScale(
+                                scale: ready ? 1.06 + .04 * t : 1,
+                                duration: const Duration(milliseconds: 200),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  transitionBuilder: (child, anim) => ScaleTransition(
+                                    scale: anim,
+                                    child: FadeTransition(opacity: anim, child: child),
+                                  ),
+                                  child: Text(
+                                    symbol,
+                                    key: ValueKey(symbol),
+                                    style: TextStyle(fontSize: size * (ready ? .48 : .40)),
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                symbol,
-                                key: ValueKey(symbol),
-                                style: TextStyle(fontSize: size * (ready ? .48 : .40)),
-                              ),
-                            ),
-                          ),
-                        ),
                       ),
 
                       // طبقة اللمس (فوق المحتوى حتى يبين الـ ripple)
