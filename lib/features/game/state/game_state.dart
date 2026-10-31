@@ -1379,13 +1379,12 @@ class GameState extends ChangeNotifier {
     _cloudTimer = Timer(const Duration(seconds: 2), _pushCloud);
   }
 
-  String _friendlyCloudError(Object error, {bool loading = false}) {
+  String _friendlyCloudError(Object error, {bool loading = false, String? stage}) {
     if (error is FirebaseException) {
       switch (error.code) {
         case 'permission-denied':
-          return error.message?.isNotEmpty == true
-              ? error.message!
-              : 'رفض Firestore الوصول. تأكد من نشر firestore.rules على مشروع Firebase الصحيح ومن تأكيد البريد الإلكتروني.';
+          final target = stage ?? (loading ? 'قراءة بيانات الحساب' : 'مزامنة بيانات اللعبة');
+          return 'تم الاحتفاظ بتقدمك على الجهاز، لكن Firebase رفض $target. انشر ملف firestore.rules المرفق على مشروع myapp2-62246 ثم أعد فتح اللعبة.';
         case 'unauthenticated':
           return 'انتهت جلسة تسجيل الدخول. سجّل الدخول من جديد.';
         case 'unavailable':
@@ -1394,12 +1393,12 @@ class GameState extends ChangeNotifier {
         case 'deadline-exceeded':
           return 'استغرقت مزامنة Firebase وقتاً طويلاً. تحقق من الاتصال وأعد المحاولة.';
         default:
-          return '${loading ? 'تعذر تحميل' : 'تعذر حفظ'} بيانات Firebase (${error.code}).';
+          final target = stage ?? (loading ? 'بيانات الحساب' : 'بيانات اللعبة');
+          return 'تعذر تحديث $target في Firebase (${error.code}). بقي الحفظ المحلي محفوظاً.';
       }
     }
-    return loading
-        ? 'تعذر تحميل بيانات الحساب من Firebase. تحقق من الاتصال ثم أعد المحاولة.'
-        : 'تعذر حفظ البيانات في Firebase. سيظهر التنبيه هنا حتى تنجح المزامنة.';
+    final target = stage ?? (loading ? 'بيانات الحساب' : 'بيانات اللعبة');
+    return 'تعذر تحديث $target في Firebase. بقي الحفظ المحلي محفوظاً؛ تحقق من الاتصال ثم أعد المحاولة.';
   }
 
   Future<void> _pushCloud() {
@@ -1412,6 +1411,7 @@ class GameState extends ChangeNotifier {
       isCloudSaving = true;
       cloudSyncError = null;
       notifyListeners();
+      var stage = 'حفظ تقدم اللعبة';
       try {
         final save = _toMap();
         final updated = (save['updated'] as num).toInt();
@@ -1433,18 +1433,23 @@ class GameState extends ChangeNotifier {
         };
 
         final db = FirebaseFirestore.instance;
-        final batch = db.batch();
-        batch.set(db.collection('users').doc(id), save);
-        batch.set(db.collection('publicProfiles').doc(id), publicProfile);
-        batch.set(db.collection('farmSnapshots').doc(id), farmSnapshot);
-        await batch.commit();
+
+        // Persist the actual game state first. The public profile and farm snapshot
+        // are secondary views used by social features, not the player's main save.
+        stage = 'حفظ تقدم اللعبة';
+        await db.collection('users').doc(id).set(save);
+        stage = 'تحديث الملف العام للاعب';
+        await db.collection('publicProfiles').doc(id).set(publicProfile);
+        stage = 'تحديث نسخة المزرعة للأصدقاء';
+        await db.collection('farmSnapshots').doc(id).set(farmSnapshot);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_cloudBaselineKey, true);
         lastCloudSync = DateTime.now();
         cloudSyncError = null;
       } catch (error) {
-        cloudSyncError = _friendlyCloudError(error);
+        debugPrint('Firebase sync failed during $stage: $error');
+        cloudSyncError = _friendlyCloudError(error, stage: stage);
       } finally {
         isCloudSaving = false;
         notifyListeners();
