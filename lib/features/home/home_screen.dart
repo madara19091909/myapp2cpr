@@ -75,25 +75,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         child: Column(
           children: [
-            TopBar(onProfileTap: _openProfile),
-            if (context.watch<GameState>().legacyUnverified)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE8C2),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE5C58A)),
-                ),
-                child: const Text(
-                  'حسابك القديم قيد المراجعة الأمنية. تم حفظ تقدمك، لكن عمليات المزرعة والشراء والبيع والمكافآت متوقفة مؤقتاً حتى يراجع الأدمن الأرصدة القديمة ويعتمد الحساب.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF704214)),
+            // The account / balance header belongs to the farm only. Keeping it
+            // outside every tab made it cover valuable space on shop and profile.
+            if (_index == 0) TopBar(onProfileTap: _openProfile),
+            Expanded(
+              child: SafeArea(
+                top: _index != 0,
+                bottom: false,
+                child: Column(
+                  children: [
+                    if (context.watch<GameState>().legacyUnverified)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE8C2),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFE5C58A)),
+                        ),
+                        child: const Text(
+                          'حسابك القديم قيد المراجعة الأمنية. تم حفظ تقدمك، لكن عمليات المزرعة والشراء والبيع والمكافآت متوقفة مؤقتاً حتى يراجع الأدمن الأرصدة القديمة ويعتمد الحساب.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF704214)),
+                        ),
+                      ),
+                    Expanded(child: IndexedStack(index: _index, children: pages)),
+                  ],
                 ),
               ),
-            Expanded(
-              child: IndexedStack(index: _index, children: pages),
             ),
           ],
         ),
