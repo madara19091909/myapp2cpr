@@ -1,7 +1,7 @@
 name: my_farm
 description: لعبة مزرعة كرتونية - الدينار العراقي والعملات الذهبية
 publish_to: 'none'
-version: 3.1.1+5
+version: 3.1.2+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -19,6 +19,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/app_icon.png"
+  min_sdk_android: 23
 
 flutter:
   uses-material-design: true
