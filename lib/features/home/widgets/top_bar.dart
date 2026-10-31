@@ -28,12 +28,12 @@ class TopBar extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
         child: Stack(
           children: [
-            Positioned(
+            const Positioned(
               top: -72,
               left: -32,
               child: _GlowCircle(size: 150, opacity: .055),
             ),
-            Positioned(
+            const Positioned(
               bottom: -84,
               right: -40,
               child: _GlowCircle(size: 150, opacity: .045),
