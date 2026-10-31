@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/cartoon_card.dart';
 import '../../../core/widgets/cartoon_button.dart';
 import '../../../core/widgets/ticker_builder.dart';
 import '../../../core/widgets/toast.dart';
@@ -121,8 +120,8 @@ class FarmScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppColors.sky, Color(0xFFBFEFFF), Color(0xFF8BD35B), AppColors.grass],
-            stops: [0, .22, .23, 1],
+            colors: [Color(0xFF9EDCF5), Color(0xFFD7F3E7), Color(0xFFA6DE82), Color(0xFF79C85B)],
+            stops: [0, .20, .21, 1],
           ),
         ),
         // Ticker واحد للشاشة كلها: now وعدد الجاهز يُحسبون مرة وحدة
@@ -302,19 +301,27 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CartoonCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .94),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white, width: 1.4),
+        boxShadow: const [
+          BoxShadow(color: Color(0x18304B32), blurRadius: 15, offset: Offset(0, 5)),
+        ],
+      ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5F7D8),
+              gradient: const LinearGradient(colors: [Color(0xFFE2F5DD), Color(0xFFC9EBCB)]),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: const Text('🌾', style: TextStyle(fontSize: 26)),
+            child: const Icon(Icons.park_rounded, color: Color(0xFF347A50), size: 24),
           ),
           const SizedBox(width: 10),
           const Expanded(
@@ -322,15 +329,27 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('مزرعتي',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.dark)),
+                Text('مزرعتك اليوم', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF263C2D))),
                 SizedBox(height: 2),
-                Text('ازرع، انتظر، واحصد أرباحك',
-                    style: TextStyle(fontSize: 11, color: AppColors.muted)),
+                Text('ازرع واعتنِ بمحاصيلك حتى تحصد الأرباح', style: TextStyle(fontSize: 10, color: Color(0xFF78877B))),
               ],
             ),
           ),
-          _FarmCount(label: 'جاهز للحصاد', value: readyCount, emoji: '✨'),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: readyCount > 0 ? const Color(0xFFFFF2CF) : const Color(0xFFF0F5EF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$readyCount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: readyCount > 0 ? const Color(0xFF9A6B13) : const Color(0xFF55715B))),
+                const Text('جاهز', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF78877B))),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -346,15 +365,15 @@ class _WaterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton.icon(
-        icon: const Icon(Icons.water_drop, size: 18),
+      child: FilledButton.tonalIcon(
+        icon: const Icon(Icons.water_drop_rounded, size: 17),
         label: Text('شراء 10 وحدات ماء — ${formatIqd(GameState.waterPackPrice)}'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF075985),
-          backgroundColor: const Color(0xFFE0F7FA),
-          side: const BorderSide(color: Color(0xFF4FC3F7), width: 1.5),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        style: FilledButton.styleFrom(
+          foregroundColor: const Color(0xFF176A8A),
+          backgroundColor: const Color(0xFFE8F7FC),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
         ),
         onPressed: onPressed,
       ),
@@ -370,67 +389,53 @@ class _ExpandCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CartoonCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .96),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: const [
+          BoxShadow(color: Color(0x1C294D2F), blurRadius: 16, offset: Offset(0, 5)),
+        ],
+      ),
       child: Row(
         children: [
-          const Text('🧱', style: TextStyle(fontSize: 25)),
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: const Color(0xFFFFF1E8), borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.grid_view_rounded, color: Color(0xFFB76C43), size: 22),
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('وسّع مزرعتك  ${game.plots.length}/${GameState.maxPlotCount}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.dark, fontSize: 13)),
-                Text('المساحة التالية: ${formatIqd(game.nextPlotPrice)} • المستوى ${game.nextPlotRequiredLevel}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.muted, fontSize: 10)),
+                Text('مساحة المزرعة  ${game.plots.length}/${GameState.maxPlotCount}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF263C2D), fontSize: 12)),
+                const SizedBox(height: 3),
+                Text('التوسعة التالية ${formatIqd(game.nextPlotPrice)} • المستوى ${game.nextPlotRequiredLevel}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF78877B), fontSize: 9)),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          SizedBox(
-            width: 112,
-            child: CartoonButton(
-              height: 40,
-              fontSize: 12,
-              leading: '➕',
-              label: 'فتح مساحة',
-              color: AppColors.green,
-              onPressed: onUnlock,
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF347A50),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
             ),
+            onPressed: onUnlock,
+            icon: const Icon(Icons.add_rounded, size: 17),
+            label: const Text('توسعة'),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FarmCount extends StatelessWidget {
-  const _FarmCount({required this.label, required this.value, required this.emoji});
-
-  final String label;
-  final int value;
-  final String emoji;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      constraints: const BoxConstraints(minWidth: 62),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: value > 0 ? const Color(0xFFFFE680) : const Color(0xFFFFF3C4),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: AppColors.gold, width: 1.5),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('$emoji $value',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.dark)),
-          Text(label,
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.muted)),
         ],
       ),
     );
@@ -445,17 +450,14 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .9), // Flutter < 3.27: withOpacity(.9)
+        color: Colors.white.withValues(alpha: .88),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.soilDark, width: 1.5),
-        boxShadow: const [BoxShadow(color: Color(0x22000000), offset: Offset(0, 2), blurRadius: 2)],
+        border: Border.all(color: Colors.white.withValues(alpha: .85)),
+        boxShadow: const [BoxShadow(color: Color(0x120F2816), offset: Offset(0, 2), blurRadius: 5)],
       ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.dark),
-      ),
+      child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF405947))),
     );
   }
 }
