@@ -1383,7 +1383,9 @@ class GameState extends ChangeNotifier {
     if (error is FirebaseException) {
       switch (error.code) {
         case 'permission-denied':
-          return 'Firebase رفض الوصول إلى بيانات الحساب. راجع قواعد Firestore المنشورة.';
+          return error.message?.isNotEmpty == true
+              ? error.message!
+              : 'رفض Firestore الوصول. تأكد من نشر firestore.rules على مشروع Firebase الصحيح ومن تأكيد البريد الإلكتروني.';
         case 'unauthenticated':
           return 'انتهت جلسة تسجيل الدخول. سجّل الدخول من جديد.';
         case 'unavailable':
@@ -1451,31 +1453,59 @@ class GameState extends ChangeNotifier {
     return _cloudSaveQueue;
   }
 
+  /// يجدد هوية Firebase قبل عمليات Firestore، لأن القواعد تشترط email_verified
+  /// وقد تبقى مطالبة البريد القديمة داخل ID token حتى بعد تأكيد البريد.
+  Future<void> _refreshVerifiedFirebaseIdentity(String expectedUid) async {
+    var user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.uid != expectedUid) {
+      throw FirebaseException(
+        plugin: 'firebase_auth',
+        code: 'unauthenticated',
+        message: 'لا توجد جلسة Firebase صالحة لهذا الحساب.',
+      );
+    }
+
+    await user.reload();
+    user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.uid != expectedUid) {
+      throw FirebaseException(
+        plugin: 'firebase_auth',
+        code: 'unauthenticated',
+        message: 'انتهت جلسة تسجيل الدخول.',
+      );
+    }
+
+    await user.getIdToken(true);
+    final token = await user.getIdTokenResult();
+    if (token.claims?['email_verified'] != true) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+        message: 'يجب تأكيد البريد الإلكتروني ثم تسجيل الدخول من جديد.',
+      );
+    }
+  }
+
   /// يعيد التحقق من Firestore قبل أول رفع بعد جلسة لعب بدأت دون إنترنت.
-  /// هذا يمنع حفظ مزرعة افتراضية فوق حساب سحابي لم نتمكن من قراءته سابقاً.
+  /// يستخدم users/{uid} بوصفه مستند الحفظ المعتمد في وضع Local First؛
+  /// لا يعتمد على gameStates الذي كان خاصاً بنظام Cloud Functions السابق.
   Future<void> _verifyCloudBaseline() async {
     final id = uid;
     if (id == null || _disposed) return;
 
     try {
+      await _refreshVerifiedFirebaseIdentity(id);
       final prefs = await SharedPreferences.getInstance();
       final baseline = prefs.getBool(_cloudBaselineKey) ?? false;
       final local = _toMap();
       final db = FirebaseFirestore.instance;
       Map<String, dynamic>? remote;
 
-      final gameStateSnapshot = await db.collection('gameStates').doc(id)
+      final cloudSnapshot = await db.collection('users').doc(id)
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 5));
-      if (gameStateSnapshot.exists && gameStateSnapshot.data() != null) {
-        remote = Map<String, dynamic>.from(gameStateSnapshot.data()!);
-      } else {
-        final legacySnapshot = await db.collection('users').doc(id)
-            .get(const GetOptions(source: Source.server))
-            .timeout(const Duration(seconds: 5));
-        if (legacySnapshot.exists && legacySnapshot.data() != null) {
-          remote = Map<String, dynamic>.from(legacySnapshot.data()!);
-        }
+      if (cloudSnapshot.exists && cloudSnapshot.data() != null) {
+        remote = Map<String, dynamic>.from(cloudSnapshot.data()!);
       }
 
       final localUpdated = (local['updated'] as num).toInt();
@@ -1563,23 +1593,15 @@ class GameState extends ChangeNotifier {
     notifyListeners();
 
     Map<String, dynamic>? remote;
-    String? remoteCollection;
     try {
+      // جدّد ID token حتى تصل مطالبة email_verified المحدثة إلى Firestore.
+      await _refreshVerifiedFirebaseIdentity(userId);
       final db = FirebaseFirestore.instance;
-      final gameStateSnapshot = await db.collection('gameStates').doc(userId)
+      final cloudSnapshot = await db.collection('users').doc(userId)
           .get(const GetOptions(source: Source.server))
           .timeout(const Duration(seconds: 5));
-      if (gameStateSnapshot.exists && gameStateSnapshot.data() != null) {
-        remote = Map<String, dynamic>.from(gameStateSnapshot.data()!);
-        remoteCollection = 'gameStates';
-      } else {
-        final legacySnapshot = await db.collection('users').doc(userId)
-            .get(const GetOptions(source: Source.server))
-            .timeout(const Duration(seconds: 5));
-        if (legacySnapshot.exists && legacySnapshot.data() != null) {
-          remote = Map<String, dynamic>.from(legacySnapshot.data()!);
-          remoteCollection = 'users';
-        }
+      if (cloudSnapshot.exists && cloudSnapshot.data() != null) {
+        remote = Map<String, dynamic>.from(cloudSnapshot.data()!);
       }
       if (token != _loadToken) return false;
 
@@ -1619,8 +1641,7 @@ class GameState extends ChangeNotifier {
       // Save locally immediately; the cloud write is debounced and never blocks an action.
       await _save();
       if (token != _loadToken) return false;
-      if (remoteCollection == 'gameStates' || remote == null ||
-          (local != null && localUpdated > remoteUpdated)) {
+      if (remote == null || (local != null && localUpdated > remoteUpdated)) {
         _cloudTimer?.cancel();
         await _pushCloud();
       }
