@@ -21,7 +21,7 @@ service cloud.firestore {
         'legacyImportedAt', 'lastOfflineRewardMessage'
       ])
       && data.name is string && data.name.size() > 0 && data.name.size() <= 24
-      && data.money is int && data.money >= 0 && data.money <= 2000000000
+      && data.money is string && data.money.size() >= 1 && data.money.size() <= 1000 && data.money.matches('^[0-9]{1,1000}$')
       && data.gold is int && data.gold >= 0 && data.gold <= 1000000
       && data.xp is int && data.xp >= 0 && data.xp <= 1000000000
       && data.level is int && data.level >= 1 && data.level <= 1000000
