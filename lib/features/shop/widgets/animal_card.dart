@@ -38,7 +38,7 @@ class AnimalCard extends StatelessWidget {
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                     Text(
                       animal.isProductive
-                          ? 'ينتج ${formatIqd(animal.incomePerCycle)} كل ${animal.cycleSeconds} ثانية'
+                          ? 'ينتج ${formatIqd(g.applySalesTax(animal.incomePerCycle))} كل ${animal.cycleSeconds} ثانية بعد الضريبة'
                           : 'يزيد أرباح الحصاد +${animal.petBonusPercent}%',
                       style: const TextStyle(fontSize: 12, color: Colors.black54),
                     ),
@@ -78,11 +78,12 @@ class AnimalCard extends StatelessWidget {
                   child: CartoonButton(
                     color: AppColors.red,
                     leading: '💰',
-                    label: 'بيع ${formatIqd((animal.price * 0.5).floor())}',
+                    label: 'بيع ${formatIqd(((animal.price * 0.5).floor() * (100 - GameState.salesTaxPercent)) ~/ 100)}',
                     onPressed: () async {
                       final err = await context.read<GameState>().sellAnimal(animal);
                       if (!context.mounted) return;
-                      showToast(context, err ?? 'تم بيع ${animal.name} واسترداد ${formatIqd((animal.price * 0.5).floor())}',
+                      final refund = ((animal.price * 0.5).floor() * (100 - GameState.salesTaxPercent)) ~/ 100;
+                      showToast(context, err ?? 'تم بيع ${animal.name} واسترداد ${formatIqd(refund)} بعد الضريبة',
                           color: err == null ? AppColors.green : AppColors.red);
                     },
                   ),
