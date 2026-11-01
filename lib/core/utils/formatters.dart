@@ -1,14 +1,15 @@
-String formatNumber(int n) {
-  final s = n.abs().toString();
-  final b = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
-    b.write(s[i]);
+String formatNumber(Object value) {
+  final n = value is BigInt ? value : BigInt.tryParse(value.toString()) ?? BigInt.zero;
+  final raw = n.abs().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < raw.length; i++) {
+    if (i > 0 && (raw.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(raw[i]);
   }
-  return n < 0 ? '-$b' : b.toString();
+  return n.isNegative ? '-$buffer' : buffer.toString();
 }
 
-String formatIqd(int n) => '${formatNumber(n)} د.ع';
+String formatIqd(Object value) => '${formatNumber(value)} د.ع';
 
 String formatDuration(int seconds) {
   if (seconds < 60) return '$secondsث';
