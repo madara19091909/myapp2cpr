@@ -1,0 +1,177 @@
+دليل نشر النسخة الأمنية لمزرعتي
+===============================
+
+تنبيه مهم قبل التنفيذ
+--------------------
+هذه النسخة غيّرت مخطط الحفظ وطريقة اللعب: الحالة الاقتصادية أصبحت تدار من Cloud
+Functions، وقواعد Firestore تمنع العميل من كتابة users/{uid} أو gameStates مباشرة.
+لا تنشر القواعد الجديدة قبل تجهيز Functions والنسخة الجديدة من التطبيق وإعداد
+App Check. لا تستخدم Service Account داخل الهاتف أو المستودع.
+
+المشروع المحدد في الملفات
+-------------------------
+Firebase Project ID: myapp2-62246
+Functions Region: us-central1
+Node.js runtime: 22
+
+المرحلة 1 — نسخ احتياطي
+----------------------
+1. خذ export/backup كامل لقاعدة Firestore من بيئة موثوقة.
+2. احتفظ بنسخة من قواعد Firestore الحالية وAPK الحالي.
+3. لا تشغّل سكربت ترحيل أو تعتمد الحسابات القديمة قبل التأكد من إمكانية الاسترجاع.
+
+المرحلة 2 — تجهيز Firebase Console
+---------------------------------
+1. تحقق أن مشروع Firebase الصحيح هو myapp2-62246.
+2. فعّل Cloud Functions والفوترة المناسبة (Blaze) واضبط Budget Alerts.
+3. فعّل طريقة تسجيل الدخول المستخدمة (Email/Password) واضبط رسالة التحقق من البريد.
+4. سجّل تطبيق Android في Firebase App Check باستخدام Play Integrity، وأضف بصمة
+   SHA-256 لشهادة التوقيع الصحيحة في إعدادات التطبيق/Play عند الحاجة.
+5. أثناء تطوير Debug، خذ Debug App Check token من سجل التطبيق وسجله في Console.
+   لا تضع Debug token في إصدار Release ولا تنشره علناً.
+6. سجّل تطبيق Web منفصلاً للوحة الإدارة. انسخ Web appId الحقيقي واستبدل النص:
+   REPLACE_WITH_WEB_APP_ID داخل admin/index.html.
+7. سجّل Web App Check باستخدام reCAPTCHA v3، واستبدل:
+   REPLACE_WITH_RECAPTCHA_V3_SITE_KEY داخل admin/index.html.
+8. اختبر حصول Android وWeb على App Check tokens قبل الاعتماد على الدوال.
+   الدوال الحالية enforceAppCheck=true؛ عدم وجود token صالح يمنع تنفيذها.
+
+المرحلة 3 — تثبيت اعتماديات الخادم واختباره
+------------------------------------------
+تحتاج Node.js 22 وFirebase CLI حديثاً على جهاز موثوق.
+من جذر المشروع:
+
+  node --version
+  npm install --global firebase-tools
+  npm --prefix functions install
+  npm --prefix functions run lint
+  npm --prefix functions test
+
+يجب أن تنجح الاختبارات الـ15 قبل النشر. إذا فشل npm بسبب اتصال الشبكة، لا تتجاوز
+الاختبارات ولا تحذف predeploy؛ أصلح الاتصال ثم أعد التثبيت.
+
+المرحلة 4 — تنظيف الملفات العامة القديمة
+---------------------------------------
+قبل السماح بقراءة publicProfiles عبر القواعد الجديدة، احذف الحقول القديمة التي
+كانت تكشف الأراضي والأرصدة.
+
+جهّز Application Default Credentials على الجهاز الموثوق، ثم:
+
+  npm install --prefix scripts
+  FIREBASE_PROJECT_ID=myapp2-62246 node scripts/migrate_public_profiles.js
+
+السكربت يحذف farmPlots وmoney وlevel من publicProfiles القديمة فقط. لا يحذف
+أرصدة users القديمة ولا يعتمد نزاهتها. راجع مخرجات السكربت وتأكد من عدد السجلات.
+
+المرحلة 5 — تجهيز حساب Super Admin
+----------------------------------
+من جهاز موثوق فقط، وبعد التأكد من UID الصحيح لحساب المالك:
+
+  GOOGLE_APPLICATION_CREDENTIALS=/secure/path/service-account.json \
+  FIREBASE_PROJECT_ID=myapp2-62246 \
+  TARGET_ADMIN_UID=PUT_REAL_UID_HERE \
+  node scripts/grant_superadmin_claim.js
+
+استبدل PUT_REAL_UID_HERE بالـUID الفعلي. لا تضع ملف Service Account في المشروع
+أو GitHub أو APK. بعد إضافة claim أعد تسجيل الدخول للحساب لتحديث ID token.
+السكربت يمنح superadmin لهذا الحساب ويضيف وثيقة admins/{uid}.
+
+المرحلة 6 — نشر Cloud Functions
+-------------------------------
+من جذر المشروع:
+
+  firebase deploy --only functions --project myapp2-62246
+
+انتظر تأكيد Firebase CLI بنجاح نشر bootstrapGame وapplyGameAction وadminUpdatePlayer.
+لا تنشر قواعد Firestore قبل التأكد من وجود هذه الدوال في المشروع والمنطقة الصحيحين.
+
+المرحلة 7 — إصدار ونشر تطبيق Flutter الجديد
+------------------------------------------
+باستخدام Flutter SDK متوافق مع المشروع:
+
+  flutter pub get
+  flutter analyze
+  flutter test
+  flutter build apk --release
+
+يجب أن يكون هذا الإصدار الجديد هو الذي سيُوزع على المستخدمين. جميع عمليات الزراعة
+والشراء والبيع والحصاد والتصنيع والمكافآت أصبحت تستدعي Cloud Functions؛ النسخة
+القديمة لن تتوافق مع قواعد Firestore الجديدة.
+
+جرّب بحساب اختبار جديد أولاً:
+- أنشئ حساباً ببريد موثق.
+- تأكد من App Check.
+- افتح اللعبة وتأكد من ظهور مزرعة ابتدائية.
+- اشترِ بذوراً وازرعها وانتظر النضج ثم احصد وبع.
+- جرّب مكافأة يومية وصندوق الحظ وطلب صداقة وقبولها وزيارة مزرعة صديق.
+- جرّب إعادة إرسال requestId نفسه في اختبار داخلي وتأكد من عدم تكرار العملية.
+- تحقق من gameStates وpublicProfiles وfarmSnapshots من Firebase Console.
+
+المرحلة 8 — ترقية الحسابات القديمة
+---------------------------------
+عند أول فتح للنسخة الجديدة، إذا لم توجد gameStates/{uid}، تُستورد بيانات
+users/{uid} وتُوسم legacyUnverified=true. لا تُقبل عمليات الاقتصاد والمكافآت
+لهذا الحساب حتى يراجعه الأدمن.
+
+هذه الخطوة ضرورية: قبل الإصلاح كان العميل قادراً على تعديل المال والمخزون والتقدم،
+ولا توجد طريقة آمنة لإثبات أن كل الأرصدة القديمة صحيحة بمجرد قراءتها.
+
+لكل حساب قديم:
+1. افتح الحساب من لوحة الإدارة بعد إعداد Web App ID وreCAPTCHA.
+2. راجع الأرصدة والمخزون والمباني والحيوانات وسجل المعاملات وأي إثبات موثوق متاح.
+3. عدّل القيم غير الصحيحة أو صفّر الحساب عند تعذر التحقق.
+4. اضغط اعتماد الحساب فقط بعد المراجعة.
+5. لا تعتمد كل اللاعبين آلياً أو جماعياً.
+
+إذا لم يكن للحساب مستند سحابي قديم، فلن يستورد التطبيق الحفظ المحلي من SharedPreferences؛
+ملف الهاتف قابل للتعديل ولا يمكن اعتماده بأمان. افحص الحسابات المهمة يدوياً قبل الترقية.
+
+المرحلة 9 — نشر قواعد Firestore أخيراً
+-------------------------------------
+بعد اكتمال ما سبق وتجربة الإصدار الجديد على حسابات اختبار:
+
+  firebase deploy --only firestore:rules --project myapp2-62246
+
+هذا يقفل كتابات العميل المباشرة على users وgameStates والبيانات العامة ولقطات
+المزارع، ويتيح فقط مسارات الصداقة المحددة في firestore.rules.
+
+نفّذ نشر القواعد ضمن نافذة ترقية منسقة. نسخ Flutter القديمة التي تحاول كتابة
+users/{uid} أو publicProfiles ستفشل بعد نشر القواعد؛ وجّه اللاعبين إلى التحديث.
+
+المرحلة 10 — ضبط التشغيل
+-----------------------
+1. في Firestore TTL، أنشئ سياسة لحقل expireAt لمجموعة gameActionReceipts حتى تحذف
+   إيصالات منع التكرار بعد 30 يوماً. وجود expireAt في المستند وحده لا يفعّل TTL.
+2. راقب Firebase Functions logs ومعدلات الأخطاء والاستدعاءات.
+3. اضبط Budget Alerts واستهلاك Cloud Functions وFirestore.
+4. استضف admin/index.html على HTTPS فقط، بعد استبدال Web appId وreCAPTCHA site key.
+5. لا تفعّل MFA للإدارة قبل تجهيز تدفق تحدي MFA في لوحة الويب الحالية؛ نسخة لوحة
+   الويب الحالية لا تتعامل بعد مع تحدي تسجيل الدخول متعدد العوامل.
+6. ثبّت GitHub Actions على commit SHA موثوق بعد مراجعة الإصدارات، ولا تسمح لأكواد
+   Pull Request غير موثوقة بالوصول إلى أسرار التوقيع.
+7. أضف Firebase Emulator Suite tests لقواعد Firestore واختبارات Flutter قبل جعل
+   الإصدار عاماً.
+
+إعدادات GitHub Actions
+----------------------
+أسرار البناء المدعومة عند استخدامها:
+FIREBASE_API_KEY
+FIREBASE_APP_ID
+FIREBASE_MESSAGING_SENDER_ID
+FIREBASE_PROJECT_ID
+FIREBASE_STORAGE_BUCKET
+
+أسرار توقيع Release الاختيارية:
+RELEASE_KEYSTORE_BASE64
+RELEASE_KEY_ALIAS
+RELEASE_KEY_PASSWORD
+RELEASE_STORE_PASSWORD
+
+ملاحظات أخيرة
+-------------
+- لم يتم نشر أي شيء إلى مشروعك الحي من هذه البيئة.
+- لم يتم بناء APK في هذه البيئة لعدم توفر Flutter/Dart.
+- لم يتم اختبار قواعد Firestore على Emulator لعدم توفر Firebase CLI.
+- npm registry لم يكن متاحاً أثناء إعداد العمل (خطأ DNS EAI_AGAIN)، لذلك لا يوجد
+  package-lock.json في الحزمة؛ ثبّت الاعتماديات في بيئة متصلة قبل النشر.
+- لا تحذف القواعد القديمة أو مستندات المستخدمين قبل أخذ نسخة احتياطية.

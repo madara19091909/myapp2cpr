@@ -1,0 +1,16 @@
+{
+  "name": "farm-party-functions",
+  "description": "Trusted economy operations for the Farm Party game",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "scripts": {
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.2"
+  }
+}
