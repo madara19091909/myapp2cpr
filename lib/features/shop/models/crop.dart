@@ -15,13 +15,14 @@ class Crop {
   final int requiredLevel;
   final int growSeconds;
 
-  /// ربح ضيق: مبكر أوضح، متوسط شحيح، متأخر يعتمد على السوق/التأمين/البونص.
+  /// هامش البيع مرفوع حتى تبقى الزراعة مربحة بصورة معقولة بعد ضريبة 25%
+  /// ورسوم السوق، مع بقاء سعر شراء البذور كما هو.
   int get sellPrice {
     final margin = requiredLevel <= 5
-        ? 1.28
+        ? 1.65
         : requiredLevel <= 20
-            ? 1.25
-            : 1.27;
+            ? 1.70
+            : 1.75;
     return (price * margin).round();
   }
 
