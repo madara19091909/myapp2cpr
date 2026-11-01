@@ -54,7 +54,7 @@ class WeeklyEvent {
       id: 'xp_rush',
       title: 'اندفاع الخبرة',
       emoji: '⭐',
-      description: 'خبرة مضاعفة تقريباً من الحصاد',
+      description: 'خبرة إضافية بنسبة 8% من الحصاد',
       sellBonusPercent: 0,
       growMultiplier: 1.0,
       xpBonusPercent: 8,
