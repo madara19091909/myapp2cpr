@@ -30,10 +30,14 @@ class _CropCardState extends State<CropCard> {
     final crop = widget.crop;
     final locked = g.level < crop.requiredLevel;
     final total = crop.price * qty;
-    final maxAffordable = (g.money ~/ crop.price).clamp(0, 9999).toInt();
-    final canBuy = !locked && total <= g.money;
+    final affordableSeeds = g.money ~/ BigInt.from(crop.price);
+    final maxAffordable = affordableSeeds > BigInt.from(9999)
+        ? 9999
+        : affordableSeeds.toInt();
+    final canBuy = !locked && BigInt.from(total) <= g.money;
     final canSell = qty <= g.ownedSeeds(crop.id) && g.ownedSeeds(crop.id) > 0;
-    final sellTotal = (crop.price * 0.6).floor() * qty;
+    final seedSellGross = (crop.price * 0.6).floor() * qty;
+    final sellTotal = seedSellGross - (seedSellGross * GameState.salesTaxPercent ~/ 100);
 
     return Opacity(
       opacity: locked ? .6 : 1,
