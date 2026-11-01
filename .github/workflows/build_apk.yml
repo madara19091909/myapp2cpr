@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -85,6 +86,7 @@ jobs:
 
           if "android.permission.INTERNET" not in text:
               permission = '    <uses-permission android:name="android.permission.INTERNET" />\n'
+
               text, count = re.subn(
                   r"(?m)^([ \t]*)(<application\b)",
                   lambda match: match.group(1) + permission + match.group(1) + match.group(2),
@@ -110,13 +112,11 @@ jobs:
           )
 
           if gradle is None:
-              raise SystemExit(
-                  "Android app Gradle file was not found."
-              )
+              raise SystemExit("Android app Gradle file was not found.")
 
           source = gradle.read_text(encoding="utf-8")
 
-          # Set compileSdk to Android API 36.
+          # Set application compileSdk to 36.
           if gradle.suffix == ".kts":
               source, count = re.subn(
                   r"(?m)^(\s*compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|\d+)",
@@ -137,7 +137,7 @@ jobs:
                   f"Could not locate compileSdk setting in {gradle}"
               )
 
-          # Keep minSdk at 23 for device compatibility.
+          # Keep minSdk at 23.
           if gradle.suffix == ".kts":
               source, count = re.subn(
                   r"(?m)^(\s*minSdk\s*=\s*)(?:flutter\.minSdkVersion|\d+)",
@@ -161,8 +161,8 @@ jobs:
           gradle.write_text(source, encoding="utf-8")
 
           print(f"Android configuration patched: {gradle}")
-          print("compileSdk = 36")
-          print("minSdk = 23")
+          print("Application compileSdk = 36")
+          print("Application minSdk = 23")
           PYCODE
 
       - name: Configure and validate release signing
@@ -456,6 +456,113 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Fix file_picker Android compileSdk
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PYCODE'
+          import json
+          import re
+          from pathlib import Path
+          from urllib.parse import urlparse, unquote
+          from urllib.request import url2pathname
+
+          config_path = Path(".dart_tool/package_config.json")
+
+          if not config_path.is_file():
+              raise SystemExit(
+                  "Flutter package configuration was not found."
+              )
+
+          config = json.loads(
+              config_path.read_text(encoding="utf-8")
+          )
+
+          package = next(
+              (
+                  item
+                  for item in config["packages"]
+                  if item["name"] == "file_picker"
+              ),
+              None,
+          )
+
+          if package is None:
+              raise SystemExit("file_picker package was not found.")
+
+          root_uri = package["rootUri"]
+          parsed = urlparse(root_uri)
+
+          if parsed.scheme == "file":
+              package_root = Path(url2pathname(parsed.path))
+          elif parsed.scheme:
+              raise SystemExit(
+                  f"Unsupported file_picker package URI: {root_uri}"
+              )
+          else:
+              package_root = (
+                  config_path.parent / unquote(root_uri)
+              ).resolve()
+
+          android_dir = package_root / "android"
+
+          if not android_dir.is_dir():
+              raise SystemExit(
+                  f"file_picker Android directory was not found: {android_dir}"
+              )
+
+          gradle_files = (
+              list(android_dir.rglob("build.gradle"))
+              + list(android_dir.rglob("build.gradle.kts"))
+          )
+
+          if not gradle_files:
+              raise SystemExit(
+                  "No Gradle files were found inside file_picker/android."
+              )
+
+          pattern = re.compile(
+              r"(?m)^([ \t]*(?:compileSdkVersion|compileSdk)"
+              r"(?:[ \t]*=[ \t]*|[ \t]+)).*$"
+          )
+
+          patched_files = []
+
+          for gradle in gradle_files:
+              source = gradle.read_text(encoding="utf-8")
+
+              updated, count = pattern.subn(
+                  lambda match: match.group(1) + "36",
+                  source,
+              )
+
+              if count > 0:
+                  gradle.write_text(updated, encoding="utf-8")
+                  patched_files.append(str(gradle))
+                  print(f"Updated: {gradle}")
+
+          if not patched_files:
+              print("Gradle files found:")
+
+              for gradle in gradle_files:
+                  print(f"- {gradle}")
+
+                  for line_number, line in enumerate(
+                      gradle.read_text(encoding="utf-8").splitlines(),
+                      start=1,
+                  ):
+                      if "compileSdk" in line:
+                          print(f"  Line {line_number}: {line.strip()}")
+
+              raise SystemExit(
+                  "Could not find a compileSdk declaration in file_picker. "
+                  "The plugin Gradle format may have changed."
+              )
+
+          print("file_picker Android compileSdk updated to 36.")
+          PYCODE
 
       - name: Generate Android launcher icons
         run: dart run flutter_launcher_icons
