@@ -36,12 +36,12 @@ class GameState extends ChangeNotifier {
   static const int maxProducts = 50000;
   static const int maxSeedBuyPerAction = 25;
   static const int maxSellPerAction = 100;
-  static const int salesTaxPercent = 15;
+  static const int salesTaxPercent = 25;
   static const int insurancePrice = 55000;
   static const int insuranceDays = 5;
 
   // حدود الموارد
-  static const int maxMoney = 2000000000;
+  static final BigInt maxMoney = BigInt.parse(List<String>.filled(1000, '9').join()); // مساحة عملية هائلة للرصيد.
   static const int maxGold = 1000000;
   static const int maxWater = 1000000;
   static const int maxFeed = 1000000;
@@ -63,7 +63,7 @@ class GameState extends ChangeNotifier {
   int _stateUpdatedAt = DateTime.now().millisecondsSinceEpoch;
 
   String playerName = 'المزارع';
-  int money = 18000;
+  BigInt money = BigInt.from(18000);
   int gold = 12;
   int xp = 0;
   int level = 1;
@@ -136,10 +136,13 @@ class GameState extends ChangeNotifier {
 
   int _creditMoney(int requested) {
     if (requested <= 0) return 0;
-    final remaining = (maxMoney - money).clamp(0, maxMoney).toInt();
-    final credited = requested.clamp(0, remaining).toInt();
+    final remaining = maxMoney - money;
+    if (remaining <= BigInt.zero) return 0;
+    final requestedAmount = BigInt.from(requested);
+    final credited = requestedAmount > remaining ? remaining : requestedAmount;
     money += credited;
-    return credited;
+    // كل مكافأة/عملية فردية تبقى ضمن int؛ BigInt يُستخدم لرصيد اللاعب التراكمي.
+    return credited.toInt();
   }
 
   int _creditGold(int requested) {
@@ -342,7 +345,7 @@ class GameState extends ChangeNotifier {
     return f.clamp(0.35, 1.45);
   }
 
-  int get yieldMultiplier => tools.contains('pickaxe') ? 2 : 1;
+  int get yieldMultiplier => 1; // أُلغي مضاعف المحصول ×2 نهائياً.
 
   int get petBonusPercent {
     var total = 0;
@@ -386,30 +389,44 @@ class GameState extends ChangeNotifier {
     return b;
   }
 
+  /// يحسب نسبة مئوية بأعداد صحيحة حتى تبقى مبالغ الرصيد الكبيرة دقيقة.
+  int _percentOf(int amount, int percent) {
+    if (amount <= 0 || percent <= 0) return 0;
+    final safePercent = percent.clamp(0, 100).toInt();
+    return (amount ~/ 100) * safePercent +
+        ((amount % 100) * safePercent ~/ 100);
+  }
+
   /// صافي المبلغ بعد ضريبة المبيعات.
   int applySalesTax(int gross) {
     if (gross <= 0) return 0;
-    final tax = (gross * salesTaxPercent / 100).floor();
-    return (gross - tax).clamp(0, maxMoney);
+    return gross - salesTaxOn(gross);
   }
 
   int salesTaxOn(int gross) {
     if (gross <= 0) return 0;
-    return (gross * salesTaxPercent / 100).floor();
+    return _percentOf(gross, salesTaxPercent);
   }
 
   /// رسوم تشغيل كنسبة من إجمالي البيع (+ تكلفة توسع المزرعة).
-  /// التأمين يخفض الرسوم فقط، لا يلغي الضريبة.
+  /// التأمين يخفض الرسوم فقط، ولا يلغي ضريبة المبيعات.
   int maintenanceFeeForSale(int gross, int qty) {
-    var rate = 0.03; // 3%
-    // توسع المزرعة يزيد الضغط الاقتصادي تدريجياً
-    if (plots.length >= 14) rate += 0.008;
-    if (plots.length >= 18) rate += 0.007;
-    if (totalAnimalCount >= 6) rate += 0.005;
-    if (rate > 0.045) rate = 0.045;
-    if (hasActiveInsurance) rate *= 0.55;
-    final fee = (gross * rate).floor() + (qty * 3);
-    return fee.clamp(15, gross);
+    if (gross <= 0) return 0;
+    var rateBasisPoints = 300; // 3%
+    // توسع المزرعة يزيد الضغط الاقتصادي تدريجياً.
+    if (plots.length >= 14) rateBasisPoints += 80;
+    if (plots.length >= 18) rateBasisPoints += 70;
+    if (totalAnimalCount >= 6) rateBasisPoints += 50;
+    if (rateBasisPoints > 450) rateBasisPoints = 450;
+    if (hasActiveInsurance) rateBasisPoints = rateBasisPoints * 55 ~/ 100;
+
+    // 10,000 نقطة أساس = 100%. التقسيم قبل الضرب يمنع تجاوز int64.
+    final rateFee = (gross ~/ 10000) * rateBasisPoints +
+        ((gross % 10000) * rateBasisPoints ~/ 10000);
+    final quantityFee = qty > 0 ? qty * 3 : 0;
+    final fee = rateFee + quantityFee;
+    if (gross <= 15) return gross;
+    return fee.clamp(15, gross).toInt();
   }
 
   int marketSalePrice(Crop crop, {DateTime? date}) {
@@ -417,14 +434,14 @@ class GameState extends ChangeNotifier {
     var totalBonus = petBonusPercent + buildingSellBonus + season.sellBonus + _weatherMarketBonus;
     if (weeklyEvent.featuredCropId == crop.id) totalBonus += 4;
     totalBonus = totalBonus.clamp(-30, 15);
-    return (marketBase * (100 + totalBonus) / 100).round().clamp(1, maxMoney);
+    return (marketBase * (100 + totalBonus) / 100).round().clamp(1, maxStat).toInt();
   }
 
   int productSalePrice(String productId) {
     for (final r in BuildingData.recipes) {
       if (r.outputId == productId) {
         final bonus = (buildingSellBonus + season.sellBonus + _weatherMarketBonus).clamp(-25, 20);
-        return (r.outputSellPrice * (100 + bonus) / 100).round().clamp(1, maxMoney);
+        return (r.outputSellPrice * (100 + bonus) / 100).round().clamp(1, maxStat).toInt();
       }
     }
     return 0;
@@ -436,9 +453,9 @@ class GameState extends ChangeNotifier {
     if (packs < 1 || packs > 999) return 'اختر عدد عبوات بين 1 و999';
     final units = waterPackSize * packs;
     final cost = waterPackPrice * packs;
-    if (money < cost) return 'رصيدك غير كافٍ لشراء الماء';
+    if (money < BigInt.from(cost)) return 'رصيدك غير كافٍ لشراء الماء';
     if (waterUnits > maxWater - units) return 'مخزون الماء ممتلئ';
-    money -= cost;
+    money -= BigInt.from(cost);
     waterUnits += units;
     _record('شراء ماء للزراعة', '$units وحدة ماء', moneyDelta: -cost);
     _commit();
@@ -486,8 +503,8 @@ class GameState extends ChangeNotifier {
       return 'تحتاج المستوى $nextPlotRequiredLevel لفتح مساحة جديدة';
     }
     final price = nextPlotPrice;
-    if (money < price) return 'رصيدك غير كافٍ لفتح مساحة جديدة';
-    money -= price;
+    if (money < BigInt.from(price)) return 'رصيدك غير كافٍ لفتح مساحة جديدة';
+    money -= BigInt.from(price);
     plots = [...plots, Plot()];
     _record('توسعة المزرعة', 'فتح مساحة زراعة ${plots.length}', moneyDelta: -price);
     _commit();
@@ -502,9 +519,9 @@ class GameState extends ChangeNotifier {
     if (item == null) return 'هذا المحصول غير موجود في المتجر';
     if (level < item.requiredLevel) return 'يتطلب المستوى ${item.requiredLevel}';
     final total = item.price * qty;
-    if (money < total) return 'رصيدك غير كافٍ 💸';
+    if (money < BigInt.from(total)) return 'رصيدك غير كافٍ 💸';
     if (ownedSeeds(item.id) > maxItemStack - qty) return 'مخزون هذه البذور ممتلئ';
-    money -= total;
+    money -= BigInt.from(total);
     seeds[item.id] = ownedSeeds(item.id) + qty;
     _record('شراء بذور', '$qty × ${item.name}', moneyDelta: -total);
     _commit();
@@ -520,14 +537,18 @@ class GameState extends ChangeNotifier {
     if (owned < qty) return 'ما عندك كمية كافية للبيع';
     final unitPrice = (item.price * 0.6).floor();
     if (unitPrice < 1) return 'لا يمكن بيع هذا العنصر حالياً';
+    final gross = unitPrice * qty;
+    final tax = salesTaxOn(gross);
+    final net = applySalesTax(gross);
+    if (net < 1) return 'بعد الضريبة لا يتبقى مبلغ للبيع';
     final remaining = owned - qty;
     if (remaining == 0) {
       seeds.remove(item.id);
     } else {
       seeds[item.id] = remaining;
     }
-    final credited = _creditMoney(unitPrice * qty);
-    _record('بيع بذور', '$qty × ${item.name}', moneyDelta: credited);
+    final credited = _creditMoney(net);
+    _record('بيع بذور', '$qty × ${item.name} (ضريبة $tax)', moneyDelta: credited);
     _commit();
     return null;
   }
@@ -537,12 +558,12 @@ class GameState extends ChangeNotifier {
     if (item == null || item.price < 1 || item.cycleSeconds < 1) {
       return 'بيانات الحيوان غير صالحة';
     }
-    if (money < item.price) return 'رصيدك غير كافٍ 💸';
+    if (money < BigInt.from(item.price)) return 'رصيدك غير كافٍ 💸';
     // نسوّي إنتاج القطيع الحالي قبل إضافة حيوان جديد حتى لا يربح عن وقت قبل شرائه.
     if (item.isProductive && ownedAnimals(item.id) > 0) {
       collectAnimal(item);
     }
-    money -= item.price;
+    money -= BigInt.from(item.price);
     if (ownedAnimals(item.id) == 0 && item.isProductive) {
       _lastCollect[item.id] = DateTime.now();
     }
@@ -559,7 +580,9 @@ class GameState extends ChangeNotifier {
     if (item == null) return 'هذا الحيوان غير موجود في المتجر';
     final owned = ownedAnimals(item.id);
     if (owned < qty) return 'ما عندك عدد كافي للبيع';
-    final refund = (item.price * 0.5).floor() * qty;
+    final gross = (item.price * 0.5).floor() * qty;
+    final tax = salesTaxOn(gross);
+    final refund = applySalesTax(gross);
     if (refund < 1) return 'لا يمكن بيع هذا الحيوان حالياً';
     if (item.isProductive) collectAnimal(item);
     animals[item.id] = owned - qty;
@@ -569,7 +592,7 @@ class GameState extends ChangeNotifier {
       _boostedCycles.remove(item.id);
     }
     final credited = _creditMoney(refund);
-    _record('بيع حيوان', '$qty × ${item.name}', moneyDelta: credited);
+    _record('بيع حيوان', '$qty × ${item.name} (ضريبة $tax)', moneyDelta: credited);
     _commit();
     return null;
   }
@@ -578,9 +601,9 @@ class GameState extends ChangeNotifier {
   Future<String?> buyAnimalFeed({int packs = 1}) async {
     if (packs < 1 || packs > 999) return 'اختر عدد أكياس بين 1 و999';
     final cost = animalFeedPackPrice * packs;
-    if (money < cost) return 'رصيدك غير كافٍ لشراء العلف';
+    if (money < BigInt.from(cost)) return 'رصيدك غير كافٍ لشراء العلف';
     if (animalFeed > maxFeed - animalFeedPackSize * packs) return 'مخزون العلف ممتلئ';
-    money -= cost;
+    money -= BigInt.from(cost);
     animalFeed += animalFeedPackSize * packs;
     _record('شراء علف الحيوانات', '$packs كيس (${animalFeedPackSize * packs} وحدات)', moneyDelta: -cost);
     _commit();
@@ -622,8 +645,8 @@ class GameState extends ChangeNotifier {
     if (item == null) return 'المبنى غير موجود';
     if (ownedBuildings.contains(item.id)) return 'تملك هذا المبنى بالفعل';
     if (level < item.requiredLevel) return 'يتطلب المستوى ${item.requiredLevel}';
-    if (money < item.price) return 'رصيدك غير كافٍ لشراء المبنى';
-    money -= item.price;
+    if (money < BigInt.from(item.price)) return 'رصيدك غير كافٍ لشراء المبنى';
+    money -= BigInt.from(item.price);
     ownedBuildings.add(item.id);
     _trackProgress('buildingsBought');
     // lifetime buildings count is owned count for achievements that use target on buildingsBought
@@ -638,8 +661,8 @@ class GameState extends ChangeNotifier {
     if (item == null) return 'الديكور غير موجود';
     if (ownedDecor.contains(item.id)) return 'تملك هذا الديكور بالفعل';
     if (level < item.requiredLevel) return 'يتطلب المستوى ${item.requiredLevel}';
-    if (money < item.price) return 'رصيدك غير كافٍ';
-    money -= item.price;
+    if (money < BigInt.from(item.price)) return 'رصيدك غير كافٍ';
+    money -= BigInt.from(item.price);
     ownedDecor.add(item.id);
     _trackProgress('decorBought');
     lifetimeStats['decorBought'] = ownedDecor.length;
@@ -650,8 +673,8 @@ class GameState extends ChangeNotifier {
 
   Future<String?> buyInsurance() async {
     if (hasActiveInsurance) return 'تأمينك ساري حتى ${insuranceUntil!.toIso8601String().substring(0, 10)}';
-    if (money < insurancePrice) return 'رصيدك غير كافٍ لشراء التأمين';
-    money -= insurancePrice;
+    if (money < BigInt.from(insurancePrice)) return 'رصيدك غير كافٍ لشراء التأمين';
+    money -= BigInt.from(insurancePrice);
     insuranceUntil = DateTime.now().add(const Duration(days: insuranceDays));
     _record('تأمين المزرعة', 'تغطية $insuranceDays أيام', moneyDelta: -insurancePrice);
     _commit();
@@ -756,7 +779,7 @@ class GameState extends ChangeNotifier {
     final tax = salesTaxOn(gross);
     final fee = maintenanceFeeForSale(gross, qty);
     final afterTax = applySalesTax(gross);
-    final net = (afterTax - fee).clamp(0, maxMoney);
+    final net = (afterTax - fee).clamp(0, gross).toInt();
     if (net < 1) return 'بعد الضريبة والرسوم لا يتبقى ربح';
     _economyBusy = true;
     try {
@@ -908,9 +931,9 @@ class GameState extends ChangeNotifier {
     final tax = salesTaxOn(gross);
     final fee = maintenanceFeeForSale(gross, qty);
     final afterTax = applySalesTax(gross);
-    final net = (afterTax - fee).clamp(0, maxMoney);
+    final net = (afterTax - fee).clamp(0, gross).toInt();
     if (net < 1) return 'بعد الضريبة ورسوم التشغيل لا يتبقى ربح من هذه الكمية';
-    if (net > maxMoney - money) return 'رصيدك قريب من الحد الأقصى؛ اصرف جزءاً من الرصيد قبل البيع';
+    if (BigInt.from(net) > maxMoney - money) return 'وصل الرصيد إلى الحد العملي الأعلى';
     _economyBusy = true;
     try {
       final left = owned - qty;
@@ -950,9 +973,9 @@ class GameState extends ChangeNotifier {
     final tax = salesTaxOn(totalGross);
     final fee = maintenanceFeeForSale(totalGross, totalQty);
     final afterTax = applySalesTax(totalGross);
-    final net = (afterTax - fee).clamp(0, maxMoney);
+    final net = (afterTax - fee).clamp(0, totalGross).toInt();
     if (net < 1) return 'بعد الضريبة ورسوم التشغيل لا يتبقى ربح';
-    if (net > maxMoney - money) return 'قيمة المحاصيل تتجاوز المساحة المتبقية في رصيدك؛ بع المحاصيل على دفعات';
+    if (BigInt.from(net) > maxMoney - money) return 'وصل الرصيد إلى الحد العملي الأعلى';
     _economyBusy = true;
     try {
       for (final id in sold.keys) {
@@ -1011,7 +1034,7 @@ class GameState extends ChangeNotifier {
   int pendingIncome(Animal animal, DateTime now) {
     final item = ShopData.tryAnimalById(animal.id);
     if (item == null) return 0;
-    return _animalIncome(item, pendingCycles(item, now));
+    return applySalesTax(_animalIncome(item, pendingCycles(item, now)));
   }
 
   /// إجمالي الإنتاج الجاهز لكل الحيوانات الإنتاجية.
@@ -1032,13 +1055,20 @@ class GameState extends ChangeNotifier {
       final cycles = pendingCycles(animal, now);
       if (cycles == 0) continue;
       processedAny = true;
-      final remaining = (maxMoney - money - total).clamp(0, maxMoney).toInt();
-      final credited = _animalIncome(animal, cycles).clamp(0, remaining).toInt();
+      final gross = _animalIncome(animal, cycles);
+      final tax = salesTaxOn(gross);
+      final net = applySalesTax(gross);
+      final remaining = maxMoney - money - BigInt.from(total);
+      final netAmount = BigInt.from(net);
+      final creditedAmount = remaining <= BigInt.zero
+          ? BigInt.zero
+          : (netAmount > remaining ? remaining : netAmount);
+      final credited = creditedAmount.toInt();
       total += credited;
-      _record('تحصيل إنتاج الحيوانات', animal.name, moneyDelta: credited);
+      _record('تحصيل إنتاج الحيوانات', '${animal.name} (ضريبة $tax)', moneyDelta: credited);
       _advanceCollect(animal, cycles, now);
     }
-    if (total > 0) money += total;
+    if (total > 0) money += BigInt.from(total);
     if (processedAny) {
       _trackProgress('animalCollections');
       _commit();
@@ -1052,8 +1082,11 @@ class GameState extends ChangeNotifier {
     final now = DateTime.now();
     final cycles = pendingCycles(item, now);
     if (cycles == 0) return 0;
-    final income = _creditMoney(_animalIncome(item, cycles));
-    _record('تحصيل إنتاج الحيوانات', item.name, moneyDelta: income);
+    final gross = _animalIncome(item, cycles);
+    final tax = salesTaxOn(gross);
+    final net = applySalesTax(gross);
+    final income = _creditMoney(net);
+    _record('تحصيل إنتاج الحيوانات', '${item.name} (ضريبة $tax)', moneyDelta: income);
     _advanceCollect(item, cycles, now);
     _trackProgress('animalCollections');
     _commit();
@@ -1108,7 +1141,7 @@ class GameState extends ChangeNotifier {
   Map<String, dynamic> _toMap() {
     final map = <String, dynamic>{
       'name': playerName,
-      'money': money,
+      'money': money.toString(),
       'gold': gold,
       'xp': xp,
       'level': level,
@@ -1156,7 +1189,7 @@ class GameState extends ChangeNotifier {
   void _resetToDefaults() {
     playerName = 'المزارع';
     _stateUpdatedAt = DateTime.now().millisecondsSinceEpoch;
-    money = 18000;
+    money = BigInt.from(18000);
     gold = 12;
     xp = 0;
     level = 1;
@@ -1195,6 +1228,20 @@ class GameState extends ChangeNotifier {
   // ---- قراءة آمنة من الخريطة المحفوظة ----
   static int _int(Object? v, int def, int min, int max) => (v is num ? v.toInt() : def).clamp(min, max).toInt();
 
+  /// يقرأ الرصيد الجديد كنص BigInt، مع دعم أرصدة الإصدارات القديمة المخزونة كأرقام.
+  static BigInt _bigMoney(Object? value, BigInt fallback) {
+    BigInt? parsed;
+    if (value is BigInt) {
+      parsed = value;
+    } else if (value is num) {
+      parsed = BigInt.from(value.toInt());
+    } else if (value is String) {
+      parsed = BigInt.tryParse(value.trim());
+    }
+    if (parsed == null || parsed.isNegative) return fallback;
+    return parsed > maxMoney ? maxMoney : parsed;
+  }
+
   static Set<String> _strSet(Object? v) => v is List ? v.map((e) => e.toString()).toSet() : <String>{};
 
   static Map<String, int> _intMap(Object? v, int max, {bool Function(String key)? keep}) {
@@ -1219,7 +1266,7 @@ class GameState extends ChangeNotifier {
       if (cleaned.isNotEmpty) playerName = cleaned;
     }
 
-    money = _int(m['money'], money, 0, maxMoney);
+    money = _bigMoney(m['money'], money);
     gold = _int(m['gold'], gold, 0, maxGold);
     xp = _int(m['xp'], xp, 0, maxStat);
     level = _int(m['level'], level, 1, maxLevel);
@@ -1247,7 +1294,8 @@ class GameState extends ChangeNotifier {
 
     tools
       ..clear()
-      ..addAll(_strSet(m['tools']));
+      // تجاهل أي أداة قديمة أزيلت من المتجر، ومنها المعول الذي كان يضاعف الحصاد.
+      ..addAll(_strSet(m['tools']).where((id) => ShopData.tryToolById(id) != null));
 
     ownedBuildings
       ..clear()
